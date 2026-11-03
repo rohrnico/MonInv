@@ -10,8 +10,8 @@ window.MONINV_CONFIG = {
   modus: 'sharepoint',
   qrAdresse: 'https://rohrnico.github.io/MonInv/',
   sharepoint: {
-    tenantId: 'Verzeichnis-ID',
-    clientId: 'Anwendungs-ID',
+    tenantId: '021f91fa-e689-4c95-8480-d96da66cc2e1',
+    clientId: '852bfd59-2109-472c-8283-635735a4f242',
     site: 'ristag.sharepoint.com:/sites/Monitoring',
     listenPrefix: 'MonInv_',
     aktualisierenSekunden: 60
