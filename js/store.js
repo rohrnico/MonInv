@@ -1,0 +1,334 @@
+/* MonInv – Datenschicht
+   Beide Speicher haben dieselbe Schnittstelle:
+     init() → Promise, load() → Promise<data>, save(col, rec), remove(col, id), replaceAll(data)
+   data = { kategorien:[], projekte:[], geraete:[], einsaetze:[], wartungen:[], einstellungen:[] }
+   Jeder Datensatz ist ein JSON-Objekt mit eindeutiger id. Neue Attribute brauchen keine
+   Änderung am Speicher (SharePoint speichert den Datensatz als JSON in der Spalte «Daten»). */
+(function () {
+  'use strict';
+
+  var COLLECTIONS = ['kategorien', 'projekte', 'geraete', 'einsaetze', 'wartungen', 'kabel', 'dateien', 'positionen', 'einstellungen'];
+
+  function emptyData() {
+    var d = {};
+    COLLECTIONS.forEach(function (c) { d[c] = []; });
+    return d;
+  }
+
+  /* ---------------------------------------------------------- lokal */
+  function LocalStore() {
+    this.mode = 'lokal';
+    this.label = 'Lokal in diesem Browser';
+    this.key = 'moninv.daten.v1';
+    this.data = null;
+    this.persistent = true;
+    this.userName = '';
+  }
+  LocalStore.prototype.init = function () { return Promise.resolve(); };
+  LocalStore.prototype.load = function () {
+    var raw = null;
+    try { raw = localStorage.getItem(this.key); } catch (e) { this.persistent = false; }
+    if (raw) {
+      try { this.data = Object.assign(emptyData(), JSON.parse(raw)); } catch (e) { this.data = null; }
+    }
+    if (!this.data) {
+      this.data = window.MonInvBeispiel ? window.MonInvBeispiel() : emptyData();
+      this._persist();
+    }
+    return Promise.resolve(this.data);
+  };
+  LocalStore.prototype._persist = function () {
+    try { localStorage.setItem(this.key, JSON.stringify(this.data)); this.persistent = true; }
+    catch (e) { this.persistent = false; }
+  };
+  LocalStore.prototype.save = function (col, rec) {
+    var arr = this.data[col];
+    var i = arr.findIndex(function (r) { return r.id === rec.id; });
+    if (i >= 0) arr[i] = rec; else arr.push(rec);
+    this._persist();
+    return Promise.resolve();
+  };
+  LocalStore.prototype.remove = function (col, id) {
+    this.data[col] = this.data[col].filter(function (r) { return r.id !== id; });
+    this._persist();
+    return Promise.resolve();
+  };
+  LocalStore.prototype.replaceAll = function (data) {
+    this.data = Object.assign(emptyData(), data);
+    this._persist();
+    return Promise.resolve();
+  };
+  LocalStore.prototype.refresh = function () { return Promise.resolve(null); };
+
+  /* Dateien (Pläne, Skizzen, Offerten) lokal: IndexedDB, damit auch grosse PDFs Platz haben */
+  function idb() {
+    if (idb.p) return idb.p;
+    idb.p = new Promise(function (res, rej) {
+      if (!window.indexedDB) return rej(new Error('Dieser Browser kann keine Dateien speichern.'));
+      var r = indexedDB.open('moninv-dateien', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('blobs'); };
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error || new Error('Dateispeicher nicht verfügbar')); };
+    });
+    return idb.p;
+  }
+  function idbDo(mode, fn) {
+    return idb().then(function (db) {
+      return new Promise(function (res, rej) {
+        var tx = db.transaction('blobs', mode), st = tx.objectStore('blobs'), out;
+        var req = fn(st);
+        if (req) req.onsuccess = function () { out = req.result; };
+        tx.oncomplete = function () { res(out); };
+        tx.onerror = tx.onabort = function () { rej(tx.error || new Error('Speichern fehlgeschlagen')); };
+      });
+    });
+  }
+  LocalStore.prototype.putBlob = function (id, name, blob) {
+    return idbDo('readwrite', function (st) { return st.put(blob, id); }).then(function () { return { key: id }; });
+  };
+  LocalStore.prototype.getBlob = function (ref) {
+    return idbDo('readonly', function (st) { return st.get(ref.key); }).then(function (b) {
+      if (!b) throw new Error('Datei nicht gefunden (nur im Browser gespeichert, in dem sie hochgeladen wurde).');
+      return b;
+    });
+  };
+  LocalStore.prototype.removeBlob = function (ref) {
+    return idbDo('readwrite', function (st) { return st.delete(ref.key); });
+  };
+
+  /* ---------------------------------------------------------- SharePoint (Microsoft Graph) */
+  var GRAPH = 'https://graph.microsoft.com/v1.0';
+  var SCOPES = ['Sites.ReadWrite.All', 'Sites.Manage.All'];
+
+  function SharePointStore(cfg) {
+    this.mode = 'sharepoint';
+    this.cfg = cfg;
+    this.label = 'SharePoint · ' + (cfg.site || '–');
+    this.siteId = null;
+    this.lists = {};      // col → listId
+    this.items = {};      // col → { recordId → itemId }
+    this.account = null;
+    this.userName = '';
+    this.data = emptyData();
+  }
+
+  /* Dateien in der Dokumentbibliothek der Website, Ordner «MonInv-Dateien» */
+  SharePointStore.prototype._raw = function (method, url, body, headers) {
+    var self = this;
+    return this._token().then(function (token) {
+      var h = Object.assign({ Authorization: 'Bearer ' + token }, headers || {});
+      return fetch(url.indexOf('http') === 0 ? url : GRAPH + url, { method: method, headers: h, body: body });
+    }).then(function (res) {
+      if (!res.ok) return res.text().then(function (t) { var e = new Error('SharePoint-Datei: HTTP ' + res.status + ' ' + t.slice(0, 160)); e.status = res.status; throw e; });
+      return res;
+    });
+  };
+  SharePointStore.prototype._drive = function () {
+    var self = this;
+    if (this.driveId) return Promise.resolve(this.driveId);
+    return this._graph('GET', '/sites/' + this.siteId + '/drive?$select=id').then(function (d) { self.driveId = d.id; return d.id; });
+  };
+  SharePointStore.prototype.putBlob = function (id, name, blob) {
+    var self = this, folder = this.cfg.dateienOrdner || 'MonInv-Dateien';
+    var safe = String(name || 'datei').replace(/[\\/:*?"<>|#%]+/g, '_').slice(-120);
+    var path = encodeURIComponent(folder) + '/' + encodeURIComponent(id + '-' + safe);
+    return this._drive().then(function (drive) {
+      if (blob.size <= 4 * 1024 * 1024) {
+        return self._raw('PUT', '/drives/' + drive + '/root:/' + path + ':/content', blob, { 'Content-Type': blob.type || 'application/octet-stream' }).then(function (r) { return r.json(); });
+      }
+      // grosse Dateien: Upload-Sitzung in Stücken von 3.75 MB (Vielfaches von 320 KiB)
+      return self._graph('POST', '/drives/' + drive + '/root:/' + path + ':/createUploadSession', { item: { '@microsoft.graph.conflictBehavior': 'replace' } }).then(function (sess) {
+        var CH = 12 * 327680, size = blob.size;
+        function part(start) {
+          var end = Math.min(size, start + CH);
+          return fetch(sess.uploadUrl, { method: 'PUT', headers: { 'Content-Range': 'bytes ' + start + '-' + (end - 1) + '/' + size }, body: blob.slice(start, end) }).then(function (res) {
+            if (!res.ok) throw new Error('SharePoint-Upload: HTTP ' + res.status);
+            if (end < size) return part(end);
+            return res.json();
+          });
+        }
+        return part(0);
+      });
+    }).then(function (item) { return { itemId: item.id, webUrl: item.webUrl }; });
+  };
+  SharePointStore.prototype.getBlob = function (ref) {
+    var self = this;
+    return this._drive().then(function (drive) {
+      return self._graph('GET', '/drives/' + drive + '/items/' + ref.itemId + '?$select=id,@microsoft.graph.downloadUrl');
+    }).then(function (it) {
+      var u = it && it['@microsoft.graph.downloadUrl'];
+      if (!u) throw new Error('Datei in SharePoint nicht gefunden.');
+      return fetch(u).then(function (r) { if (!r.ok) throw new Error('Download: HTTP ' + r.status); return r.blob(); });
+    });
+  };
+  SharePointStore.prototype.removeBlob = function (ref) {
+    var self = this;
+    return this._drive().then(function (drive) { return self._raw('DELETE', '/drives/' + drive + '/items/' + ref.itemId); }).catch(function (e) { if (e.status !== 404) throw e; });
+  };
+
+  SharePointStore.prototype.logout = function () {
+    if (this.pca) return this.pca.logoutRedirect({ account: this.account, postLogoutRedirectUri: location.href.split('#')[0] });
+  };
+
+  SharePointStore.prototype.init = function () {
+    var self = this, cfg = this.cfg;
+    if (!window.msal) return Promise.reject(new Error('Microsoft-Login-Bibliothek fehlt (vendor/msal).'));
+    if (!cfg.tenantId || !cfg.clientId || !cfg.site) {
+      return Promise.reject(new Error('SharePoint ist in config.js noch nicht eingerichtet (tenantId, clientId, site).'));
+    }
+    this.pca = new msal.PublicClientApplication({
+      auth: {
+        clientId: cfg.clientId,
+        authority: 'https://login.microsoftonline.com/' + cfg.tenantId,
+        redirectUri: location.origin + location.pathname
+      },
+      cache: { cacheLocation: 'localStorage' }
+    });
+    return this.pca.handleRedirectPromise().then(function (res) {
+      if (res && res.account) self.account = res.account;
+      if (!self.account) self.account = self.pca.getAllAccounts()[0] || null;
+      if (!self.account) {
+        return self.pca.loginRedirect({ scopes: SCOPES }).then(function () { return new Promise(function () {}); });
+      }
+      self.userName = self.account.name || self.account.username || '';
+      return self._resolveSite();
+    });
+  };
+
+  SharePointStore.prototype._token = function () {
+    var self = this;
+    return this.pca.acquireTokenSilent({ scopes: SCOPES, account: this.account })
+      .then(function (r) { return r.accessToken; })
+      .catch(function (e) {
+        if (e instanceof msal.InteractionRequiredAuthError) {
+          return self.pca.acquireTokenRedirect({ scopes: SCOPES }).then(function () { return new Promise(function () {}); });
+        }
+        throw e;
+      });
+  };
+
+  SharePointStore.prototype._graph = function (method, path, body, retry) {
+    var self = this;
+    return this._token().then(function (token) {
+      return fetch(path.indexOf('http') === 0 ? path : GRAPH + path, {
+        method: method,
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+    }).then(function (res) {
+      if ((res.status === 429 || res.status === 503) && !retry) {
+        var wait = (parseInt(res.headers.get('Retry-After'), 10) || 3) * 1000;
+        return new Promise(function (r) { setTimeout(r, wait); }).then(function () { return self._graph(method, path, body, true); });
+      }
+      if (res.status === 204) return null;
+      return res.json().then(function (j) {
+        if (!res.ok) {
+          var msg = (j && j.error && j.error.message) || ('HTTP ' + res.status);
+          var err = new Error('SharePoint: ' + msg);
+          err.status = res.status;
+          throw err;
+        }
+        return j;
+      });
+    });
+  };
+
+  SharePointStore.prototype._resolveSite = function () {
+    var self = this;
+    return this._graph('GET', '/sites/' + this.cfg.site + '?$select=id').then(function (s) {
+      self.siteId = s.id;
+      return self._graph('GET', '/sites/' + self.siteId + '/lists?$select=id,displayName&$top=999');
+    }).then(function (r) {
+      var byName = {};
+      (r.value || []).forEach(function (l) { byName[l.displayName] = l.id; });
+      var missing = [];
+      COLLECTIONS.forEach(function (c) {
+        var name = self.cfg.listenPrefix + c;
+        if (byName[name]) self.lists[c] = byName[name]; else missing.push(c);
+      });
+      return missing.reduce(function (p, c) {
+        return p.then(function () { return self._createList(c); });
+      }, Promise.resolve());
+    });
+  };
+
+  SharePointStore.prototype._createList = function (col) {
+    var self = this;
+    return this._graph('POST', '/sites/' + this.siteId + '/lists', {
+      displayName: this.cfg.listenPrefix + col,
+      columns: [{ name: 'Daten', text: { allowMultipleLines: true, textType: 'plain' } }],
+      list: { template: 'genericList' }
+    }).then(function (l) { self.lists[col] = l.id; });
+  };
+
+  SharePointStore.prototype._loadList = function (col) {
+    var self = this, out = [], map = {};
+    var url = '/sites/' + this.siteId + '/lists/' + this.lists[col] + '/items?$expand=fields($select=Title,Daten)&$top=999';
+    function page(u) {
+      return self._graph('GET', u).then(function (r) {
+        (r.value || []).forEach(function (it) {
+          var f = it.fields || {};
+          try {
+            var rec = JSON.parse(f.Daten || '{}');
+            rec.id = rec.id || f.Title;
+            if (rec.id) { out.push(rec); map[rec.id] = it.id; }
+          } catch (e) { /* defekte Zeile überspringen */ }
+        });
+        if (r['@odata.nextLink']) return page(r['@odata.nextLink']);
+      });
+    }
+    return page(url).then(function () { self.items[col] = map; return out; });
+  };
+
+  SharePointStore.prototype.load = function () {
+    var self = this;
+    return Promise.all(COLLECTIONS.map(function (c) { return self._loadList(c); })).then(function (res) {
+      var d = emptyData();
+      COLLECTIONS.forEach(function (c, i) { d[c] = res[i]; });
+      self.data = d;
+      return d;
+    });
+  };
+  SharePointStore.prototype.refresh = SharePointStore.prototype.load;
+
+  SharePointStore.prototype.save = function (col, rec) {
+    var self = this;
+    var itemId = this.items[col] && this.items[col][rec.id];
+    var base = '/sites/' + this.siteId + '/lists/' + this.lists[col] + '/items';
+    var fields = { Title: rec.id, Daten: JSON.stringify(rec) };
+    if (itemId) return this._graph('PATCH', base + '/' + itemId + '/fields', fields);
+    return this._graph('POST', base, { fields: fields }).then(function (it) {
+      self.items[col] = self.items[col] || {};
+      self.items[col][rec.id] = it.id;
+    });
+  };
+
+  SharePointStore.prototype.remove = function (col, id) {
+    var itemId = this.items[col] && this.items[col][id];
+    if (!itemId) return Promise.resolve();
+    var self = this;
+    return this._graph('DELETE', '/sites/' + this.siteId + '/lists/' + this.lists[col] + '/items/' + itemId)
+      .then(function () { delete self.items[col][id]; });
+  };
+
+  /* Import (z.B. Umzug vom Testbetrieb): schreibt alle Datensätze, bestehende werden überschrieben. */
+  SharePointStore.prototype.replaceAll = function (data, onProgress) {
+    var self = this, jobs = [];
+    COLLECTIONS.forEach(function (c) { (data[c] || []).forEach(function (r) { jobs.push([c, r]); }); });
+    var done = 0;
+    return jobs.reduce(function (p, j) {
+      return p.then(function () {
+        return self.save(j[0], j[1]).then(function () { done++; if (onProgress) onProgress(done, jobs.length); });
+      });
+    }, Promise.resolve());
+  };
+
+  window.MonStore = {
+    COLLECTIONS: COLLECTIONS,
+    emptyData: emptyData,
+    create: function (cfg) {
+      if (cfg && cfg.modus === 'sharepoint') return new SharePointStore(cfg.sharepoint || {});
+      return new LocalStore();
+    }
+  };
+})();
