@@ -566,7 +566,7 @@
       var G = M.ABR_GRUPPEN[g], sub = 0, rows = '';
       arr.forEach(function (P) {
         var U = M.posUnits(P.id).list, akt = U.filter(function (u) { return u.aktiv; }), nd = 0;
-        akt.forEach(function (u) { nd += u.devs.length; });
+        akt.forEach(function (u) { nd += u.devs.filter(function (id) { var g = I.ger[id]; return !(g.typ === 'mcc' && u.devs.indexOf(I.tsOfMcc[id]) >= 0); }).length; });   // MCC zählt mit ihrem Tachymeter als ein Gerät
         var cur = akt.length * M.posPreis(P); sub += cur;
         rows += '<tr class="pos-row" data-act="pos-edit" data-id="' + P.id + '" style="--gc:' + G.c + '"><td class="mono strong">' + esc(P.nr || '') + '</td>' +
           '<td><b>' + esc(P.text || '') + '</b><br><span class="muted small">' + (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') + '</span></td>' +

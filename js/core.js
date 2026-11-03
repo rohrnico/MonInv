@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.5.4';
+  M.VERSION = '0.5.5';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -573,7 +573,7 @@
       }
       jobs.push(M.put('einsaetze', c));
     }
-    ids.forEach(function (id) {
+    ids.map(function (id) { var g = I.ger[id]; return g && g.typ === 'mcc' && I.tsOfMcc[id] ? I.tsOfMcc[id] : id; }).forEach(function (id) {
       var g = I.ger[id]; if (!g) return;
       var key = P ? (P.art === 'set' ? einheit : (g.typ === 'tachymeter' && g.mccId ? 'ts-' + id : null)) : null;
       one(id, key);
@@ -784,7 +784,20 @@
     return out;
   };
   /* Einheiten einer Position: Set (mehrere Geräte, ein Preis) oder Stück (jedes Gerät eine Einheit) */
-  M.unitKey = function (P, e) { return e.einheit ? 'S:' + e.einheit : P.art === 'set' ? 'S:' + e.id : 'G:' + e.geraetId; };
+  function baseUnitKey(P, e) { return e.einheit ? 'S:' + e.einheit : P.art === 'set' ? 'S:' + e.id : 'G:' + e.geraetId; }
+  /* Tachymeter + MCC sind zusammen immer EINE Einheit: die MCC folgt dem Tachymeter, sobald beide
+     (zeitlich überlappend) in derselben Position stehen – egal wie die Einsätze erfasst wurden. */
+  M.unitKey = function (P, e) {
+    var I = M.idx(), g = I.ger[e.geraetId];
+    if (!g || (g.typ !== 'tachymeter' && g.typ !== 'mcc')) return baseUnitKey(P, e);
+    if (g.typ === 'tachymeter') return P.art === 'set' ? baseUnitKey(P, e) : 'G:' + g.id;
+    var tsId = I.tsOfMcc[g.id]; if (!tsId) return baseUnitKey(P, e);
+    var eb = e.bis || '9999-12-31';
+    var te = (I.ein[tsId] || []).filter(function (x) { return x.positionId === P.id && x.ort === 'feld' && x.von <= eb && (x.bis || '9999-12-31') >= e.von; })
+      .sort(function (a, b) { return a.von < b.von ? 1 : -1; })[0];
+    if (!te) return baseUnitKey(P, e);
+    return P.art === 'set' ? baseUnitKey(P, te) : 'G:' + tsId;
+  };
   M.posUnits = function (pid) {
     var I = M.idx();
     if (I.units[pid]) return I.units[pid];
