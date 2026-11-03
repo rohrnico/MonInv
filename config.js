@@ -8,7 +8,7 @@
 
 window.MONINV_CONFIG = {
   modus: 'sharepoint',
-  qrAdresse: 'https://ristag.github.io/moninv/',
+  qrAdresse: 'https://rohrnico.github.io/MonInv/',
   sharepoint: {
     tenantId: 'Verzeichnis-ID',
     clientId: 'Anwendungs-ID',

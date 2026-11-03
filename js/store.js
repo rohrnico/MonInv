@@ -176,6 +176,13 @@
     if (!cfg.tenantId || !cfg.clientId || !cfg.site) {
       return Promise.reject(new Error('SharePoint ist in config.js noch nicht eingerichtet (tenantId, clientId, site).'));
     }
+    var guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!guid.test(String(cfg.tenantId).trim()) || !guid.test(String(cfg.clientId).trim())) {
+      return Promise.reject(new Error('In config.js stehen bei tenantId und clientId noch keine gültigen IDs. Dort die «Verzeichnis-ID (Mandant)» und die «Anwendungs-ID (Client)» aus Microsoft Entra › App-Registrierungen › MonInv › Übersicht eintragen (Format 0a1b2c3d-…).'));
+    }
+    if (!/^[^:\/]+\.sharepoint\.com:\/sites\/[^/]+/i.test(String(cfg.site).trim())) {
+      return Promise.reject(new Error('In config.js ist «site» nicht im richtigen Format. Beispiel: ristag.sharepoint.com:/sites/Monitoring (Host, Doppelpunkt, Pfad).'));
+    }
     this.pca = new msal.PublicClientApplication({
       auth: {
         clientId: cfg.clientId,
