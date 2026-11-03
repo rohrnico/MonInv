@@ -881,3 +881,31 @@ body.viewer-open { overflow: hidden; }
 .abr-pg thead th { font-size: 10.5px; }
 .pg-dat { font-size: 11.5px; color: var(--stein); white-space: nowrap; }
 .pg-dat.ab { color: var(--signal-t); }
+/* Spalte «Monate» hervorheben */
+.abr-pg th.anz { background: #B25616; color: #fff; }
+.abr-pg td.anz { background: #FDECDD; color: #7A3408; font-weight: 700; border-left: 2px solid #F3C9A8; border-right: 2px solid #F3C9A8; }
+.abr-pg .abr-sub td.anz, .abr-pg tfoot td.anz { background: #F9D8BE; }
+
+/* ---------- Geplante Laufzeit */
+.plan-box { background: var(--himmel-2); padding: 10px 12px 2px; margin: 6px 0 8px; }
+.plan-box .lbl { font: 700 11.5px var(--f-head); letter-spacing: .06em; text-transform: uppercase; color: var(--blau); display: block; margin-bottom: 6px; }
+.plan-box .lbl .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.plan-box .row-in { flex-wrap: wrap; }
+.plan-box .plan-m { width: 110px; }
+.plan-box input[type=date] { width: 170px; }
+.pl-tag { display: inline-block; margin-top: 3px; padding: 1px 6px; background: #EEF4FB; color: var(--blau); font: 600 11.5px var(--f-mono); border-radius: 2px; }
+.pl-tag.soon { background: #FFF1DE; color: #8A4B00; }
+.pl-tag.over { background: #FBE3DF; color: #9B1C0F; }
+.g-plan { position: absolute; top: 9px; height: 12px; border: 1.5px dashed #5E86B8; border-left: 0; box-sizing: border-box; background: rgba(0,70,142,.05); }
+.g-over { position: absolute; top: 9px; height: 12px; background: repeating-linear-gradient(45deg, #D64531 0 3px, #F3B3A9 3px 6px); opacity: .9; }
+.g-pend { position: absolute; top: 6px; height: 18px; width: 0; border-left: 2px solid #5E86B8; }
+.g-today { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1.5px solid var(--signal); z-index: 1; }
+.gt.g-now { color: var(--signal-t); border-left-color: var(--signal); font-weight: 700; }
+.pm-h { min-width: 170px; }
+.pm { display: flex; flex-direction: column; gap: 3px; min-width: 160px; }
+.pm-bar { position: relative; display: block; height: 7px; background: #ECEBEA; }
+.pm-bar i { position: absolute; top: 0; left: 0; height: 7px; display: block; }
+.pm-g { background: #A9C6E8; } .pm-v { background: var(--blau); }
+.pm-o { width: 2px !important; height: 11px !important; top: -2px !important; background: var(--nacht); }
+.pm-n { font-size: 11.5px; color: var(--stein); }
+.pm-n.ok { color: #1D5B3F; } .pm-n.warn { color: #8A4B00; } .pm-n.bad { color: #9B1C0F; font-weight: 700; }

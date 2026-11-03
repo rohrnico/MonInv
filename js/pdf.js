@@ -5,6 +5,7 @@
   'use strict';
   var M = window.M;
 
+  var MON_BG = [253, 236, 221], MON_BG2 = [249, 216, 190], MON_HEAD = [178, 86, 22], MON_TXT = [122, 52, 8];
   var BLAU = [0, 70, 142], NACHT = [0, 21, 42], STEIN = [94, 92, 91], LINIE = [226, 225, 224], NEBEL = [244, 244, 243];
   function hex(h) { h = h.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
   function chf(n) { return n ? M.chf(Math.round(n * 100) / 100) : '–'; }
@@ -21,7 +22,7 @@
       var W = 297, H = 210, ML = 12, MR = 12, MT = 12, MB = 14, X1 = W - MR;
       var mons = A.monate, nm = mons.length, showM = nm <= 18;
       // Spalten: Name | Monate … | Anz. | Ansatz V B W | Betrag V B W Total
-      var wAnz = 12, wAns = 15, wBet = 19, fixed = wAnz + 3 * wAns + 4 * wBet;
+      var wAnz = 16, wAns = 15, wBet = 19, fixed = wAnz + 3 * wAns + 4 * wBet;
       var wName = showM ? (nm > 12 ? 58 : 72) : 110;
       var wMon = showM && nm ? (X1 - ML - fixed - wName) / nm : 0;
       if (!showM) wName = X1 - ML - fixed;
@@ -41,6 +42,8 @@
       }
       function fill(col, x0, y0, w, h) { doc.setFillColor(col[0], col[1], col[2]); doc.rect(x0, y0, w, h, 'F'); }
       function line(col, x0, y0, x1, y1, lw) { doc.setDrawColor(col[0], col[1], col[2]); doc.setLineWidth(lw || 0.2); doc.line(x0, y0, x1, y1); }
+      var nX0 = cols.find(function (c) { return c.k === 'n'; }).x;
+      function monCol(yy, h, dark) { fill(dark ? MON_BG2 : MON_BG, nX0, yy, wAnz, h); }
       var ansX0 = cols.find(function (c) { return c.g === 'ans'; }).x, betX0 = cols.find(function (c) { return c.g === 'bet'; }).x;
 
       function kopf(first) {
@@ -65,6 +68,7 @@
         var hh = 10;
         fill(NACHT, ML, y, X1 - ML, hh);
         fill([31, 58, 92], ansX0, y, 3 * wAns, hh);
+        fill(MON_HEAD, nX0, y, wAnz, hh);
         font('head', 6.4, [185, 195, 207]);
         doc.text('ANSATZ CHF PRO MONAT', ansX0 + PAD, y + 3.4);
         doc.text('BETRAG CHF (ANSATZ × MONATE)', betX0 + PAD, y + 3.4);
@@ -91,7 +95,7 @@
           if (o.flags === null && (c.k === 'm' || c.k === 'n')) return;   // Positionszeile: keine Monate
           var v;
           if (c.k === 'm') { var i = mons.indexOf(c.mk); v = o.flags[i] ? String(o.flags[i]) : '·'; }
-          else if (c.k === 'n') v = String(o.n);
+          else if (c.k === 'n') { font('bold', opt.fs + 0.4, MON_TXT); txt(String(o.n), c, yy); font(opt.st, opt.fs, opt.col); return; }
           else if (c.g === 'ans') v = o[c.k] === null ? '' : ans(o[c.k]);
           else v = chf(o[c.k]);
           if (c.k === 'm' && v === '·') { font('normal', opt.fs, [180, 178, 176]); txt(v, c, yy); font(opt.st, opt.fs, opt.col); }
@@ -106,7 +110,7 @@
         var gc = hex(G[g].c), gl = hex(G[g].l), gt = hex(G[g].t);
         var gs = { n: 0, v: 0, b: 0, w: 0, t: 0 };
         need(7 + 12);
-        fill(gl, ML, y, X1 - ML, 6.5); fill(gc, ML + 1.6, y + 2.1, 2.3, 2.3);
+        fill(gl, ML, y, X1 - ML, 6.5); fill(gc, ML + 1.6, y + 2.1, 2.3, 2.3); monCol(y, 6.5);
         font('head', 9.5, gt); doc.text(G[g].n, ML + 5.6, y + 4.6);
         y += 6.5;
         ps.forEach(function (xp) {
@@ -126,6 +130,7 @@
           font('normal', 6.6, STEIN); doc.text(sub, ML + PAD + 1.2, y + 3.6 * tl.length + 2.9);
           var o = { flags: null, n: S.n, av: P ? M.num(P.V) || 0 : null, ab: P ? M.num(P.B) || 0 : null, aw: P ? M.num(P.W) || 0 : null, v: S.v, b: S.b, w: S.w, t: S.t };
           fill([238, 243, 250], ansX0, y, 3 * wAns, rh);
+          monCol(y, rh);
           font('bold', 8, NACHT); rowCells(o, y + 3.6, { st: 'bold', fs: 8, col: NACHT });
           if (wp) { font('normal', 6, STEIN); txt('+' + M.chf(wp) + ' einmalig', cols.find(function (c) { return c.k === 'aw'; }), y + 7); }
           y += rh;
@@ -139,6 +144,7 @@
             need(dh);
             if (idx % 2) fill(NEBEL, ML + 1, y, X1 - ML - 1, dh);
             fill([238, 243, 250], ansX0, y, 3 * wAns, dh);
+            monCol(y, dh);
             fill(LINIE, ML, y, 1, dh);
             font('normal', 7.6, BLAU); doc.text(ll, ML + PAD + 4.5, y + 3.3);
             if (mt) { font('normal', 6, u.bis ? [154, 98, 6] : STEIN); doc.text('(' + mt + ')', ML + PAD + 4.5, y + 3.3 + 3.4 * (ll.length - 1) + 2.8); }
@@ -152,6 +158,7 @@
         // Total der Gruppe
         need(7);
         fill(gl, ML, y, X1 - ML, 6.5);
+        monCol(y, 6.5, true);
         font('head', 8.2, gt); doc.text('Total ' + G[g].n, ML + PAD + 1.2, y + 4.5);
         font('bold', 8, NACHT);
         rowCells({ flags: A.G[g].per.map(function (c) { return c.n; }), n: gs.n, av: null, ab: null, aw: null, v: gs.v, b: gs.b, w: gs.w, t: gs.t }, y + 4.5, { st: 'bold', fs: 8, col: NACHT });
@@ -160,6 +167,7 @@
       if (posten.length) {
         // Total Projekt
         need(16);
+        monCol(y, 8, true);
         line(BLAU, ML, y, X1, y, 0.8);
         font('head', 10, NACHT); doc.text('Total Projekt', ML + PAD, y + 5.6);
         var tn = posten.reduce(function (a, x) { return a + x.sum.n; }, 0);

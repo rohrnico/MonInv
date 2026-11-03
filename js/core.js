@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.4.8';
+  M.VERSION = '0.5.0';
 
   /* ---------- Hilfen */
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -153,6 +153,47 @@
 
   M.projName = function (p) { return p ? (p.typ === 'magazin' ? p.name : (p.nummer ? p.nummer + ' ' : '') + p.name) : '–'; };
   /* Amortisation eines Einsatzes: pauschal einmalig, oder pro Monat solange das Gerät dort steht */
+  /* ---------- Geplante Laufzeit eines Einsatzes */
+  M.addMonths = function (iso, n) {
+    var d = new Date(iso + 'T00:00:00'), day = d.getDate();
+    var t = new Date(d.getFullYear(), d.getMonth() + (+n || 0), 1);
+    var last = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+    t.setDate(Math.min(day, last));
+    return M.iso(t);
+  };
+  /* Monate zwischen zwei Daten nach der Abrechnungsregel (mehr als 10 Tage im Kalendermonat = 1), ohne Begrenzung auf heute */
+  M.monateZwischen = function (von, bis) {
+    if (!von || !bis || bis <= von) return 0;
+    var n = 0, y = +von.slice(0, 4), m = +von.slice(5, 7) - 1, guard = 0;
+    while (guard++ < 600) {
+      var a = M.iso(new Date(y, m, 1)), b = M.iso(new Date(y, m + 1, 1));
+      if (a >= bis) break;
+      var s = von > a ? von : a, e = bis < b ? bis : b;
+      if (e > s && M.days(s, e) > M.MIN_TAGE) n++;
+      m++; if (m > 11) { m = 0; y++; }
+    }
+    return n;
+  };
+  /* Plan eines Einsatzes: { bis, monate, rest (Tage bis Planende), ueber (Tage überfällig), offen } */
+  M.planInfo = function (e) {
+    if (!e || e.ort !== 'feld' || !e.planBis) return null;
+    var heute = M.today(), laufend = !e.bis;
+    var r = { bis: e.planBis, monate: M.monateZwischen(e.von, e.planBis), laufend: laufend };
+    if (laufend) {
+      if (heute > e.planBis) r.ueber = M.days(e.planBis, heute);
+      else r.rest = M.days(heute, e.planBis);
+    } else r.diff = M.days(e.planBis, e.bis);   // + = länger als geplant
+    return r;
+  };
+  M.planText = function (e, kurz) {
+    var p = M.planInfo(e); if (!p) return '';
+    var mo = e.planMonate || p.monate;
+    var s = 'geplant bis ' + M.fmtDate(p.bis) + (kurz ? '' : ' (' + mo + (mo === 1 ? ' Monat' : ' Monate') + (e.planMonate && p.monate !== e.planMonate ? ', ' + p.monate + ' abgerechnet' : '') + ')');
+    if (p.ueber) s += ' · ' + p.ueber + ' Tage überfällig';
+    else if (p.rest !== undefined && !kurz) s += ' · noch ' + (p.rest > 45 ? Math.round(p.rest / 30.4) + ' Monate' : p.rest + ' Tage');
+    return s;
+  };
+
   /* Abgerechnete Monate: pro Kalendermonat 1, wenn mehr als 10 Tage in Betrieb, sonst 0 (siehe M.monatsAnteile) */
   function halbeMonate(e, stich) {
     var f = M.monatsAnteile([[e.von, e.bis]], stich), s = 0;
@@ -412,12 +453,19 @@
     target.einheit = target.positionId ? (t.positionId !== undefined ? (t.einheit || null) : (sameProj ? cur.einheit || null : null)) : null;
     // Tachymeter und seine MCC bilden zusammen eine Einheit
     if (target.positionId && !target.einheit && g.typ === 'tachymeter' && g.mccId) target.einheit = M.uid('set');
+    // Geplante Laufzeit: angegeben (Monate ab Datum oder bis Datum), sonst bei gleichem Projekt die bisherige
+    if (!feld) { target.planBis = null; target.planMonate = null; }
+    else if (t.planMonate) { target.planMonate = +t.planMonate; target.planBis = M.addMonths(datum, +t.planMonate); }
+    else if (t.planBis !== undefined) { target.planBis = t.planBis || null; target.planMonate = null; }
+    else { target.planBis = sameProj ? cur.planBis || null : null; target.planMonate = sameProj ? cur.planMonate || null : null; }
     if (cur) {
       if (cur.ort === target.ort && (cur.magazinId || null) === target.magazinId && (cur.projektId || null) === target.projektId &&
         cur.lat === target.lat && cur.lng === target.lng) {
-        var ch = (cur.auftrag || '') !== target.auftrag || (cur.positionId || null) !== target.positionId || (cur.einheit || null) !== target.einheit;
+        // gleicher Ort: Laufzeit in Monaten ab dem bisherigen Einsatzbeginn
+        if (t.planMonate) target.planBis = M.addMonths(cur.von, +t.planMonate);
+        var ch = (cur.auftrag || '') !== target.auftrag || (cur.positionId || null) !== target.positionId || (cur.einheit || null) !== target.einheit || (cur.planBis || null) !== (target.planBis || null);
         if (ch) {
-          var ca = M.copy(cur); ca.auftrag = target.auftrag; ca.positionId = target.positionId; ca.einheit = target.einheit;
+          var ca = M.copy(cur); ca.auftrag = target.auftrag; ca.positionId = target.positionId; ca.einheit = target.einheit; ca.planBis = target.planBis || null; ca.planMonate = target.planMonate || null;
           if (target.positionId) { ca.amortModus = 'position'; ca.amortBetrag = 0; }
           var j2 = [M.put('einsaetze', ca)];
           if (g.typ === 'tachymeter' && g.mccId) j2.push(M.followTo(g.mccId, target, datum, wer));
@@ -468,9 +516,11 @@
     var cur = (M.idx().ein[mid] || []).find(function (e) { return !e.bis; });
     var same = cur && cur.ort === target.ort && (cur.magazinId || null) === (target.magazinId || null) && (cur.projektId || null) === (target.projektId || null);
     if (same && !force) {
-      var chg = (M.has(target.auftrag) && (cur.auftrag || '') !== target.auftrag) || (target.positionId !== undefined && ((cur.positionId || null) !== (target.positionId || null) || (cur.einheit || null) !== (target.einheit || null)));
+      var chg = (M.has(target.auftrag) && (cur.auftrag || '') !== target.auftrag) || (target.positionId !== undefined && ((cur.positionId || null) !== (target.positionId || null) || (cur.einheit || null) !== (target.einheit || null))) ||
+        (target.planBis !== undefined && (cur.planBis || null) !== (target.planBis || null));
       if (chg) {
         var ca = M.copy(cur);
+        if (target.planBis !== undefined) { ca.planBis = target.planBis || null; ca.planMonate = target.planMonate || null; }
         if (M.has(target.auftrag)) ca.auftrag = target.auftrag;
         if (target.positionId !== undefined) { ca.positionId = target.positionId || null; ca.einheit = target.einheit || null; if (ca.positionId) { ca.amortModus = 'position'; ca.amortBetrag = 0; } }
         M.put('einsaetze', ca);
@@ -537,6 +587,23 @@
       jobs.push(M.put('einsaetze', c));
     });
     jobs.push(M.del('positionen', pid));
+    return Promise.all(jobs);
+  };
+
+  /* Geplante Laufzeit am laufenden Einsatz setzen (ohne Historien-Eintrag); MCC folgt ihrem Tachymeter */
+  M.setPlan = function (ids, t) {
+    var I = M.idx(), jobs = [], done = {};
+    function one(id) {
+      if (done[id]) return; done[id] = 1;
+      var cur = (I.ein[id] || []).find(function (e) { return !e.bis; });
+      if (!cur || cur.ort !== 'feld') return;
+      var c = M.copy(cur);
+      if (t.planMonate) { c.planMonate = +t.planMonate; c.planBis = M.addMonths(cur.von, +t.planMonate); }
+      else { c.planBis = t.planBis || null; c.planMonate = null; }
+      if ((cur.planBis || null) === (c.planBis || null) && (cur.planMonate || null) === (c.planMonate || null)) return;
+      jobs.push(M.put('einsaetze', c));
+    }
+    ids.forEach(function (id) { var g = I.ger[id]; if (!g) return; one(id); if (g.typ === 'tachymeter' && g.mccId) one(g.mccId); });
     return Promise.all(jobs);
   };
 
@@ -790,7 +857,26 @@
   };
 
   /* Abrechnung als Posten: je Position die Einheiten (Geräte) mit Monaten im Zeitraum, Ansatz und Beträgen */
-  M.montageText = function (r) { return r.von ? 'montiert ' + M.fmtDate(r.von) + (r.bis ? ' · abgebaut ' + M.fmtDate(r.bis) : '') : ''; };
+  M.montageText = function (r) { return r.von ? 'montiert ' + M.fmtDate(r.von) + (r.bis ? ' · abgebaut ' + M.fmtDate(r.bis) : (r.planBis ? ' · geplant bis ' + M.fmtDate(r.planBis) : '')) : ''; };
+  /* Geplantes Ende einer laufenden Einheit (spätestes Planende ihrer laufenden Geräte; null wenn eines ungeplant ist) */
+  M.unitPlanBis = function (u) {
+    var run = u.eins.filter(function (e) { return !e.bis; });
+    if (!run.length || run.some(function (e) { return !e.planBis; })) return null;
+    return run.map(function (e) { return e.planBis; }).sort().pop();
+  };
+  /* Monate einer Position: verrechnet bis heute, geplant (ganze Laufzeit), offeriert */
+  M.posMonate = function (P) {
+    var r = { verr: 0, geplant: 0, offen: 0, off: M.num(P.offMonate) || 0 };
+    M.posUnits(P.id).list.forEach(function (u) {
+      var f = M.monatsAnteile(u.eins.map(function (e) { return [e.von, e.bis]; })), n = 0;
+      Object.keys(f).forEach(function (k) { n += f[k]; });
+      r.verr += n;
+      if (!u.aktiv) { r.geplant += n; return; }
+      var pb = M.unitPlanBis(u);
+      if (pb) r.geplant += Math.max(n, M.monateZwischen(u.von, pb)); else { r.geplant += n; r.offen++; }
+    });
+    return r;
+  };
   M.abrPosten = function (A) {
     var I = M.idx(), mons = A.monate, inR = {};
     mons.forEach(function (mk) { inR[mk] = 1; });
@@ -801,7 +887,7 @@
         var u = uu.u, flags = mons.map(function (mk) { return uu.f[mk] || 0; }), n = flags.reduce(function (a, b) { return a + b; }, 0);
         var devs = u.devs.slice().sort(function (a, b) { return (I.ger[a].typ === 'mcc' ? 1 : 0) - (I.ger[b].typ === 'mcc' ? 1 : 0) || String(I.ger[a].name).localeCompare(String(I.ger[b].name), 'de', { numeric: true }); });
         var names = devs.map(function (id) { return I.ger[id].name; });
-        var r = { devs: devs, von: u.von || null, bis: u.bis || null, label: names.join(' + '), set: P && P.art === 'set' && u.nr ? 'Set ' + u.nr : '', flags: flags, n: n, v: 0, b: 0, w: 0, wp: 0 };
+        var r = { devs: devs, von: u.von || null, bis: u.bis || null, planBis: u.bis ? null : M.unitPlanBis(u), label: names.join(' + '), set: P && P.art === 'set' && u.nr ? 'Set ' + u.nr : '', flags: flags, n: n, v: 0, b: 0, w: 0, wp: 0 };
         if (P) {
           r.av = M.num(P.V) || 0; r.ab = M.num(P.B) || 0; r.aw = M.num(P.W) || 0;
           r.v = r.av * n; r.b = r.ab * n; r.w = r.aw * n;

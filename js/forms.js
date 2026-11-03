@@ -17,6 +17,7 @@
       '<form class="md-f" data-form="' + o.form + '" novalidate><div class="md-b">' + o.body + '</div><div class="md-ft">' + (o.foot || '') + '</div></form></div></div>';
     document.body.classList.add('modal-open');
     root.querySelectorAll('.posbox').forEach(function (bx) { M.posSync(bx.id.replace(/-posbox$/, '')); });
+    root.querySelectorAll('.plan-box').forEach(function (bx) { M.planInfoUpdate(bx.id.replace(/-planbox$/, '')); });
     var first = root.querySelector('.md-b input:not([type=hidden]):not([type=radio]):not([type=checkbox]), .md-b select, .md-b textarea');
     if (first && !o.noFocus) setTimeout(function () { first.focus(); }, 30);
   };
@@ -60,10 +61,58 @@
       '<fieldset class="extra loc"><legend>Projekt</legend>' +
       '<div class="grid2">' + fld('Projekt (optional)', '<select id="' + p + '-proj" data-change="loc-proj" data-p="' + p + '"' + (ort === 'magazin' ? ' disabled' : '') + '>' + M.projOptions(init.projektId || '', true, '– kein Projekt –') + '</select>') +
       fld('Auftragsnummer / Teilprojekt', '<input id="' + p + '-auftrag" list="auftrag-list" maxlength="40" value="' + esc(init.auftrag || '') + '" placeholder="z.B. 26160-03"' + (ort === 'magazin' ? ' disabled' : '') + '>' + M.auftragList()) + '</div>' +
+      M.planBoxHtml(p, init, ort === 'magazin') +
       '<div id="' + p + '-posbox" class="posbox">' + (ort === 'magazin' ? '' : M.posBoxHtml(p, init.projektId, init, opts.n || 1)) + '</div>' +
       '<p class="muted small" id="' + p + '-projhint">' + (ort === 'magazin' ? 'Im Magazin läuft kein Projekt.' : 'Für Abrechnung und Projekthistorie. Der Standort oben bleibt davon unabhängig.') + '</p></fieldset>';
     return h;
   }
+  /* Geplante Laufzeit: Monate (ab Einsatzbeginn) oder bis Datum */
+  M.planBoxHtml = function (p, init, hidden) {
+    init = init || {};
+    var mode = init.planBis && !init.planMonate ? 'datum' : 'monate', had = init.planBis ? '1' : '';
+    return '<div class="plan-box" id="' + p + '-planbox" data-had="' + had + '"' + (hidden ? ' hidden' : '') + '><span class="lbl">Geplante Laufzeit <span class="muted">(optional – für Planung und Offertkontrolle)</span></span>' +
+      '<input type="hidden" id="' + p + '-planmode" value="' + mode + '"><div class="row-in">' +
+      '<div class="seg" role="group" aria-label="Laufzeit angeben als"><button type="button" data-act="plan-mode" data-p="' + p + '" data-k="monate" class="' + (mode === 'monate' ? 'on' : '') + '" aria-pressed="' + (mode === 'monate') + '">Monate</button>' +
+      '<button type="button" data-act="plan-mode" data-p="' + p + '" data-k="datum" class="' + (mode === 'datum' ? 'on' : '') + '" aria-pressed="' + (mode === 'datum') + '">bis Datum</button></div>' +
+      '<input id="' + p + '-planm" type="number" min="1" max="240" inputmode="numeric" placeholder="z.B. 12" aria-label="Laufzeit in Monaten" class="r plan-m" value="' + esc(init.planMonate || '') + '" data-input="plan-in" data-p="' + p + '"' + (mode === 'monate' ? '' : ' hidden') + '>' +
+      '<input id="' + p + '-pland" type="date" aria-label="Geplant bis" value="' + esc(init.planBis || '') + '" data-change="plan-in" data-p="' + p + '"' + (mode === 'datum' ? '' : ' hidden') + '></div>' +
+      '<p class="muted small" id="' + p + '-planinfo"></p></div>';
+  };
+  function planStart(p) {
+    var el = $(p === 'el' ? 'e-von' : p + '-date');
+    return (el && el.value) || (M.ctx && M.ctx.planVon) || M.today();
+  }
+  M.planInfoUpdate = function (p) {
+    var el = $(p + '-planinfo'); if (!el) return;
+    var mode = val(p + '-planmode'), von = planStart(p);
+    var viele = M.ctx && M.ctx.kind === 'laufzeit' && M.ctx.ids.length > 1;
+    if (mode === 'monate' && viele) {
+      var n0 = M.num(val(p + '-planm'));
+      el.textContent = n0 ? 'Endet ' + n0 + ' Monate nach dem Montagedatum jedes Geräts.' : 'Leer lassen, wenn noch offen.';
+    } else if (mode === 'monate') {
+      var n = M.num(val(p + '-planm'));
+      el.textContent = n ? 'Endet geplant am ' + M.fmtDate(M.addMonths(von, n)) + ' (ab ' + M.fmtDate(von) + ').' : 'Leer lassen, wenn noch offen.';
+    } else {
+      var b = val(p + '-pland');
+      el.textContent = b ? (b <= von ? 'Das Datum liegt vor dem Beginn (' + M.fmtDate(von) + ').' : '= ' + M.monateZwischen(von, b) + ' abgerechnete Monate ab ' + M.fmtDate(von) + '.') : 'Leer lassen, wenn noch offen.';
+    }
+  };
+  M.planSetMode = function (p, k) {
+    $(p + '-planmode').value = k;
+    document.querySelectorAll('[data-act=plan-mode][data-p="' + p + '"]').forEach(function (b) { var on = b.getAttribute('data-k') === k; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    $(p + '-planm').hidden = k !== 'monate'; $(p + '-pland').hidden = k !== 'datum';
+    M.planInfoUpdate(p);
+  };
+  function readPlan(p, t) {
+    var box = $(p + '-planbox'); if (!box || box.hidden) return;
+    var mode = val(p + '-planmode');
+    var n = mode === 'monate' ? M.num(val(p + '-planm')) : null, b = mode === 'datum' ? val(p + '-pland') : '';
+    if (n) { t.planMonate = n; delete t.planBis; }
+    else if (b) { t.planBis = b; t.planMonate = null; }
+    else if (box.getAttribute('data-had')) { t.planBis = ''; t.planMonate = null; }   // bewusst geleert
+  }
+  M.readPlan = readPlan;
+
   /* Offertposition und Set wählen (ersetzt den Amortisationsbetrag) */
   M.posBoxHtml = function (p, projektId, sel, n) {
     sel = sel || {};
@@ -154,6 +203,7 @@
     if ($(p + '-auftrag')) t.auftrag = val(p + '-auftrag').trim();
     if ($(p + '-amort')) { t.amortModus = val(p + '-amodus') || 'monat'; t.amortBetrag = M.num(val(p + '-amort')); }
     readPos(p, t);
+    readPlan(p, t);
     if (val(p + '-e') || val(p + '-n')) {
       var w = M.parseLv95(val(p + '-e'), val(p + '-n'));
       if (!w) return { err: 'LV95-Koordinaten prüfen (Ost 2\'xxx\'xxx, Nord 1\'xxx\'xxx).' };
@@ -179,6 +229,7 @@
     $(p + '-proj').disabled = k === 'magazin';
     if ($(p + '-auftrag')) $(p + '-auftrag').disabled = k === 'magazin';
     if ($(p + '-posbox')) { $(p + '-posbox').innerHTML = k === 'magazin' ? '' : M.posBoxHtml(p, val(p + '-proj'), {}, (M.ctx && M.ctx.n) || 1); M.posSync(p); }
+    if ($(p + '-planbox')) $(p + '-planbox').hidden = k === 'magazin';
     $(p + '-projhint').textContent = k === 'magazin' ? 'Im Magazin läuft kein Projekt.' : 'Für Abrechnung und Projekthistorie. Der Standort oben bleibt davon unabhängig.';
     if (M.movePreview && M.ctx && M.ctx.kind === 'move') M.movePreview();
   };
@@ -558,9 +609,10 @@
     var b = '<div class="mv-from">' + M.symbol(gid, 36) + '<div><b>' + esc(g.name) + '</b><span>Bisher: ' + esc(i.ortText) + (i.proj ? ' · Projekt ' + esc(M.projName(i.proj)) : '') + '</span></div></div>' +
       fld('Gerät', '<select id="pg-dev" data-change="pg-dev">' + group('Im Magazin', mag) + group('Im Feld', feld) + group('Ohne Standort', ohne) + '</select>') +
       '<div class="grid2">' + fld('Projekt (optional)', '<select id="pg-proj" data-change="loc-proj" data-p="pg">' + M.projOptions(i.proj ? i.proj.id : '', true, '– kein Projekt –') + '</select>') +
-      fld('Datum', inp('pg-date', M.today(), 'type="date"')) + '</div>' +
+      fld('Datum', inp('pg-date', M.today(), 'type="date" data-change="plan-in" data-p="pg"')) + '</div>' +
       fld('Auftragsnummer / Teilprojekt', '<input id="pg-auftrag" list="auftrag-list" maxlength="40" placeholder="z.B. 26160-03" value="' + esc(i.cur && i.cur.auftrag || '') + '">' + M.auftragList()) +
       '<div id="pg-posbox" class="posbox">' + M.posBoxHtml('pg', i.proj ? i.proj.id : '', i.cur || {}, 1) + '</div>' +
+      M.planBoxHtml('pg', {}) +
       amortFields('pg', { modus: la.modus, betrag: la.betrag }) +
       (g.typ === 'tachymeter' ? mccSelect('pg-mcc', gid, g.mccId) : '') +
       fld('Wer', inp('pg-wer', M.userKuerzel(), 'maxlength="40"')) +
@@ -573,6 +625,7 @@
     var gid = M.ctx.gid, g = M.idx().ger[gid];
     var t = { ort: 'feld', projektId: val('pg-proj') || null, auftrag: val('pg-auftrag').trim(), amortModus: val('pg-amodus') || 'monat', amortBetrag: M.num(val('pg-amort')) || 0 };
     readPos('pg', t);
+    readPlan('pg', t);
     var mcc = null;
     if (g.typ === 'tachymeter') {
       mcc = val('pg-mcc');
@@ -691,6 +744,8 @@
       '<p class="muted small" id="po-richt"></p>' +
       '<div class="grid3">' + fld('Wartung einmalig CHF', inp('po-Wp', d.Wp, 'inputmode="decimal" class="r" placeholder="optional"')) +
       fld('Unsere Kosten Betrieb / Mt.', inp('po-kB', d.kB, 'inputmode="decimal" class="r" placeholder="optional"')) + fld('Unsere Kosten Wartung / Mt.', inp('po-kW', d.kW, 'inputmode="decimal" class="r" placeholder="optional"')) + '</div>' +
+      '<div class="grid3">' + fld('Offeriert: Monate total', inp('po-offMonate', d.offMonate, 'inputmode="numeric" class="r" placeholder="z.B. 24"')) +
+      '<p class="muted small po-offhint">Einheiten × Monate laut Offerte, z.B. 2 Tachymeter × 12 Monate = 24. MonInv vergleicht damit die verrechneten und die geplanten Monate.</p></div>' +
       '<p class="muted small">Vorhalten fliesst voll in die Amortisation der Geräte (im Set nach Anschaffungswert verteilt). Betrieb und Wartung laufen pro ' + (d.art === 'set' ? 'Set' : 'Gerät') + '; mit unseren Kosten zeigt MonInv die Marge.</p></div>';
     // Geräte zuweisen
     b += '<fieldset class="extra"><legend>Geräte im Projekt</legend>';
@@ -729,7 +784,7 @@
     var c = M.ctx, I = M.idx();
     var d = c.pid ? M.copy(I.pos[c.pid]) : { id: M.uid('pos'), projektId: c.projektId };
     d.nr = val('po-nr'); d.text = val('po-text'); d.auftrag = val('po-auftrag'); d.gruppe = val('po-gruppe') || 'sen'; d.art = val('po-art') === 'set' ? 'set' : 'stk';
-    ['V', 'B', 'W', 'Wp', 'kB', 'kW'].forEach(function (k) { d[k] = M.num(val('po-' + k)); if (d[k] === null) d[k] = ''; });
+    ['V', 'B', 'W', 'Wp', 'kB', 'kW', 'offMonate'].forEach(function (k) { d[k] = M.num(val('po-' + k)); if (d[k] === null) d[k] = ''; });
     d.bemerkung = $('po-bem').value.trim();
     if (!d.text) { $('po-err').textContent = 'Bitte die Bezeichnung eingeben.'; return; }
     if (!M.has(d.V) || d.V === '') { $('po-err').textContent = 'Bitte den Preis für Vorhalten eingeben (0 ist möglich).'; return; }
@@ -757,6 +812,28 @@
       M.toast('Position ' + (d.nr || '') + ' gespeichert' + (add.length ? ' · ' + add.length + ' Geräte zugewiesen' : '') + (rem.length ? ' · ' + rem.length + ' entfernt' : ''));
       M.refreshUI();
     });
+  };
+
+  /* ================================================== LAUFZEIT (ein oder mehrere Geräte, laufender Einsatz) */
+  M.openLaufzeit = function (ids) {
+    var all = [];
+    ids.forEach(function (id) { var i = M.info(id); if (all.indexOf(id) < 0) all.push(id); if (i.members) i.members.forEach(function (m) { if (all.indexOf(m) < 0) all.push(m); }); });
+    var feld = all.filter(function (id) { var i = M.info(id); return i.cur && !i.isMag && !i.mccTs; });
+    if (!feld.length) { M.toast('Keines der Geräte steht im Feld. Die Laufzeit gilt für einen Einsatz im Feld.'); return; }
+    var one = feld.length === 1 ? M.info(feld[0]).cur : null;
+    M.ctx = { kind: 'laufzeit', ids: feld, planVon: one ? one.von : null };
+    var b = '<p>' + (feld.length === 1 ? esc(M.idx().ger[feld[0]].name) + ' · im Einsatz seit ' + M.fmtDate(one.von) : feld.length + ' Geräte im Feld') + (all.length > feld.length ? ' (' + (all.length - feld.length) + ' im Magazin oder ohne Standort ausgelassen)' : '') + '.</p>' +
+      M.planBoxHtml('lz', one ? { planBis: one.planBis, planMonate: one.planMonate } : {}) +
+      '<p class="muted small">Gilt für den laufenden Einsatz. Monate zählen ab dem Montagedatum jedes Geräts' + (feld.length > 1 ? ' (bei mehreren Geräten kann das Enddatum deshalb verschieden sein)' : '') + '. Ein Tachymeter nimmt seine MCC mit. Leer lassen und speichern entfernt die Planung.</p>';
+    M.modal({ title: 'Geplante Laufzeit', form: 'laufzeit', body: b, foot: foot('Speichern') });
+    $('lz-planbox').setAttribute('data-had', '1');
+    M.planInfoUpdate('lz');
+  };
+  M.submitLaufzeit = function () {
+    var t = {}; readPlan('lz', t);
+    var ids = M.ctx.ids;
+    M.closeModal();
+    M.setPlan(ids, t).then(function () { M.state.invSel = {}; M.toast(t.planMonate ? 'Laufzeit ' + t.planMonate + ' Monate · ' + ids.length + (ids.length === 1 ? ' Gerät' : ' Geräte') : t.planBis ? 'Geplant bis ' + M.fmtDate(t.planBis) + ' · ' + ids.length + (ids.length === 1 ? ' Gerät' : ' Geräte') : 'Planung entfernt'); M.refreshUI(); });
   };
 
   /* ================================================== AUFTRAGSNUMMER (mehrere) */
@@ -854,7 +931,7 @@
     M.ctx = { kind: 'einsatz', eid: eid };
     var b = '<div class="mv-from">' + M.symbol(g.id, 32) + '<div><b>' + esc(g.name) + '</b><span>Einsatz korrigieren</span></div></div>' +
       locFields('el', e, { later: false, amort: { modus: e.amortModus, betrag: e.amortBetrag } }) + '<div class="grid2">' +
-      fld('Von', inp('e-von', e.von, 'type="date" required')) +
+      fld('Von', inp('e-von', e.von, 'type="date" required data-change="plan-in" data-p="el"')) +
       fld('Bis (leer = laufend)', inp('e-bis', e.bis, 'type="date"')) +
       fld('Ortsbezeichnung', inp('e-ortname', e.ortName, 'maxlength="80" placeholder="wird aus der Position ermittelt"')) +
       fld('Gesetzt von', inp('e-ges', e.gesetztVon, 'maxlength="40"')) +
@@ -869,6 +946,10 @@
     if (r.err) { $('e-err').textContent = r.err; return; }
     var moved = r.t.lat !== e.lat || r.t.lng !== e.lng;
     Object.assign(e, { ort: r.t.ort, magazinId: r.t.magazinId || null, projektId: r.t.projektId || null, lat: M.has(r.t.lat) ? r.t.lat : null, lng: M.has(r.t.lng) ? r.t.lng : null, auftrag: r.t.ort === 'feld' ? (r.t.auftrag || '') : '' });
+    if (r.t.ort === 'feld') {
+      if (r.t.planMonate) { e.planMonate = r.t.planMonate; e.planBis = M.addMonths(val('e-von') || e.von, r.t.planMonate); }
+      else if (r.t.planBis !== undefined) { e.planBis = r.t.planBis || null; e.planMonate = null; }
+    } else { e.planBis = null; e.planMonate = null; }
     if (r.t.ort === 'feld' && r.t.positionId) { e.positionId = r.t.positionId; e.einheit = r.t.einheit || null; e.amortModus = 'position'; e.amortBetrag = 0; }
     else if (r.t.ort === 'feld') { e.positionId = null; e.einheit = null; e.amortModus = r.t.amortModus === 'position' ? 'monat' : (r.t.amortModus || 'monat'); e.amortBetrag = M.num(r.t.amortBetrag) || 0; }
     else { e.positionId = null; e.einheit = null; e.amortModus = 'pauschal'; e.amortBetrag = 0; }
@@ -1042,6 +1123,7 @@
     else if (f === 'bulkpos') M.submitBulkPos();
     else if (f === 'auftrag') M.submitAuftrag();
     else if (f === 'position') M.submitPosition();
+    else if (f === 'laufzeit') M.submitLaufzeit();
     else if (f === 'msnew') M.submitMsNew();
     else if (f === 'msadd') M.submitMsAdd();
     else if (f === 'msedit') M.submitGruppeEdit();

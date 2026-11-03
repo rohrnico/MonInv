@@ -270,7 +270,7 @@
     var I = M.idx(), p = I.proj[pid], r = M.state.abr, A = M.abrechnung(pid, r.von, r.bis), G = M.ABR_GRUPPEN, posten = M.abrPosten(A);
     function rd(x) { return Math.round((x || 0) * 100) / 100; }
     function mtxt(mk) { return mk.slice(5, 7) + '.' + mk.slice(0, 4); }
-    var head = ['Gruppe', 'Pos.', 'Bezeichnung', 'Auftrag', 'Preisart', 'Gerät / Einheit', 'Montiert', 'Abgebaut'].concat(A.monate.map(mtxt))
+    var head = ['Gruppe', 'Pos.', 'Bezeichnung', 'Auftrag', 'Preisart', 'Gerät / Einheit', 'Montiert', 'Abgebaut', 'Geplant bis'].concat(A.monate.map(mtxt))
       .concat(['Monate', 'Ansatz Vorhalten CHF / Mt.', 'Ansatz Betrieb CHF / Mt.', 'Ansatz Wartung CHF / Mt.', 'Wartung einmalig CHF', 'Vorhalten CHF', 'Betrieb CHF', 'Wartung CHF', 'Total CHF']);
     var rows = [['Abrechnung ' + M.projName(p) + ' · ' + mtxt(A.monate[0] || r.von) + ' bis ' + mtxt(A.monate[A.monate.length - 1] || r.bis) + ' · Monat zählt ab mehr als 10 Tagen in Betrieb'], [], head];
     M.ABR_ORDER.forEach(function (g) {
@@ -279,14 +279,14 @@
       ps.forEach(function (x) {
         var P = x.P, S = x.sum, base = [G[g].n, P ? P.nr || '' : '', P ? P.text : 'ohne Position (Einzelansatz)', P ? P.auftrag || '' : '', P ? (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') : ''];
         ['n', 'v', 'b', 'w', 't'].forEach(function (k) { gs[k] += S[k]; });
-        rows.push(base.concat(['Total Position', '', '']).concat(S.per.map(function () { return ''; })).concat(['', P ? rd(M.num(P.V)) : '', P ? rd(M.num(P.B)) : '', P ? rd(M.num(P.W)) : '', P && M.num(P.Wp) ? rd(M.num(P.Wp)) : '', rd(S.v), rd(S.b), rd(S.w), rd(S.t)]));
+        rows.push(base.concat(['Total Position', '', '', '']).concat(S.per.map(function () { return ''; })).concat(['', P ? rd(M.num(P.V)) : '', P ? rd(M.num(P.B)) : '', P ? rd(M.num(P.W)) : '', P && M.num(P.Wp) ? rd(M.num(P.Wp)) : '', rd(S.v), rd(S.b), rd(S.w), rd(S.t)]));
         x.rows.forEach(function (u) {
-          rows.push(base.concat([(u.set ? u.set + ': ' : '') + u.label, u.von ? M.fmtDate(u.von) : '', u.bis ? M.fmtDate(u.bis) : '']).concat(u.flags).concat([u.n, rd(u.av) + (u.ohne && u.modus === 'pauschal' ? ' pauschal' : ''), rd(u.ab), rd(u.aw), u.wp ? rd(u.wp) : '', rd(u.v), rd(u.b), rd(u.w), rd(u.t)]));
+          rows.push(base.concat([(u.set ? u.set + ': ' : '') + u.label, u.von ? M.fmtDate(u.von) : '', u.bis ? M.fmtDate(u.bis) : '', u.planBis ? M.fmtDate(u.planBis) : '']).concat(u.flags).concat([u.n, rd(u.av) + (u.ohne && u.modus === 'pauschal' ? ' pauschal' : ''), rd(u.ab), rd(u.aw), u.wp ? rd(u.wp) : '', rd(u.v), rd(u.b), rd(u.w), rd(u.t)]));
         });
       });
-      rows.push(['Total ' + G[g].n, '', '', '', '', '', '', ''].concat(A.G[g].per.map(function (c) { return c.n; })).concat([gs.n, '', '', '', '', rd(gs.v), rd(gs.b), rd(gs.w), rd(gs.t)]));
+      rows.push(['Total ' + G[g].n, '', '', '', '', '', '', '', ''].concat(A.G[g].per.map(function (c) { return c.n; })).concat([gs.n, '', '', '', '', rd(gs.v), rd(gs.b), rd(gs.w), rd(gs.t)]));
     });
-    rows.push(['Total Projekt', '', '', '', '', '', '', ''].concat(A.monate.map(function (mk, i) { return M.ABR_ORDER.reduce(function (a, g) { return a + A.G[g].per[i].n; }, 0); }))
+    rows.push(['Total Projekt', '', '', '', '', '', '', '', ''].concat(A.monate.map(function (mk, i) { return M.ABR_ORDER.reduce(function (a, g) { return a + A.G[g].per[i].n; }, 0); }))
       .concat([posten.reduce(function (a, x) { return a + x.sum.n; }, 0), '', '', '', '', rd(A.total.v), rd(A.total.b), rd(A.total.w), rd(A.total.t)]));
     download('MonInv-Abrechnung-' + (p.nummer || p.name).replace(/[^\w-]+/g, '_') + '-' + r.von + '_bis_' + r.bis + '.csv', csv(rows), 'text/csv;charset=utf-8');
   };
@@ -428,6 +428,9 @@
       $('po-preislbl').textContent = 'Preis pro ' + (d.k === 'set' ? 'Set' : 'Gerät') + ' und Monat (Offerte)';
       M.posRicht();
     },
+    'plan-mode': function (d) { M.planSetMode(d.p, d.k); },
+    'bulk-plan': function () { M.openLaufzeit(selectedIds()); },
+    'laufzeit': function (d) { M.openLaufzeit([d.id]); },
     'bulk-auftrag': function () { M.openAuftrag(selectedIds()); },
     'bulk-ms': function () { M.openMsNew(selectedIds()); },
     'ms-new': function (d) { M.openMsNew(String(d.ids || '').split(',').filter(Boolean)); },
@@ -605,6 +608,7 @@
 
   var CHANGE = {
     'po-dev': function () { M.posRicht(); },
+    'plan-in': function (d) { M.planInfoUpdate(d.p); },
     'loc-proj': function (d, el) {
       var p = d.p, bx = $(p + '-posbox'); if (!bx) return;
       bx.innerHTML = M.posBoxHtml(p, el.value, {}, (M.ctx && M.ctx.n) || 1); M.posSync(p);
@@ -651,11 +655,12 @@
     'import-json': function (d, el) { if (el.files && el.files[0]) M.importJson(el.files[0]); el.value = ''; },
     'g-kat': function () { var dr = M.readGeraetDraft(); M.openGeraet(M.ctx.gid, dr.typ, dr); },
     'g-simk': function () { var on = $('g-sim-yes').checked; $('g-sim').disabled = !on; if (on) $('g-sim').focus(); },
-    'mv-preview': function (d, el) { if (el && el.id === 'mv-proj') CHANGE['loc-proj']({ p: 'mv' }, el); else M.movePreview(); }
+    'mv-preview': function (d, el) { if (el && el.id === 'mv-proj') CHANGE['loc-proj']({ p: 'mv' }, el); else M.movePreview(); M.planInfoUpdate('mv'); }
   };
 
   M.ACT = ACT; M.CHANGE = CHANGE;   // Erweiterungen (z.B. labels.js) melden hier eigene Aktionen an
   var INPUT = {
+    'plan-in': function (d) { M.planInfoUpdate(d.p); },
     'msa-q': function (d, el) {
       var q = el.value.trim().toLowerCase();
       document.querySelectorAll('.msa-row').forEach(function (r) { r.hidden = q && r.getAttribute('data-name').indexOf(q) < 0 && !r.querySelector('input').checked; });
