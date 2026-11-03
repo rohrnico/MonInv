@@ -7,15 +7,13 @@
    (Anleitung in ANLEITUNG.md) und hier eintragen:                                  */
 
 window.MONINV_CONFIG = {
-  modus: 'lokal',
-  // Adresse der App für die QR-Etiketten, z.B. 'https://ristag.github.io/moninv/'. Leer = die Adresse, unter der die App gerade läuft.
-  qrAdresse: '',
-
+  modus: 'sharepoint',
+  qrAdresse: 'https://ristag.github.io/moninv/',
   sharepoint: {
-    tenantId: '',            // Verzeichnis-ID (Mandant), z.B. '0a1b2c3d-…'
-    clientId: '',            // Anwendungs-ID (Client) der registrierten App
-    site: '',                // z.B. 'ristag.sharepoint.com:/sites/Monitoring'
-    listenPrefix: 'MonInv_', // Präfix der SharePoint-Listen, die die App anlegt
+    tenantId: 'Verzeichnis-ID',
+    clientId: 'Anwendungs-ID',
+    site: 'ristag.sharepoint.com:/sites/Monitoring',
+    listenPrefix: 'MonInv_',
     aktualisierenSekunden: 60
   }
 };
