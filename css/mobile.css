@@ -34,6 +34,10 @@
   .link-btn { min-height: 32px; }
 
   /* ---------- Kopf: Marke, Suche über die ganze Breite, Scannen */
+  /* Kopf fest oben: Safari (iOS 26) erkennt ihn so als Kopfleiste und färbt die Statusleiste weiss,
+     statt den App-Kopf unter seinem Glas-Effekt unscharf auszublenden */
+  body { padding-top: calc(var(--top-h) + env(safe-area-inset-top)); }
+  .top { position: fixed; top: 0; left: 0; right: 0; }
   .top { height: calc(var(--top-h) + env(safe-area-inset-top)); gap: 8px; border-bottom-width: 3px;
     padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
   .b-name { font-size: 21px; }

@@ -69,10 +69,9 @@
     return ger.find(function (g) { return g.qr && g.qr.toUpperCase() === up; }) || ger.find(function (g) { return g.id === s; }) ||
       ger.find(function (g) { return (g.name || '').toUpperCase() === up; }) || ger.find(function (g) { return g.seriennummer && String(g.seriennummer).toUpperCase() === up; }) || null;
   };
-  /* Gerät aus Code öffnen: Karte mit Panel (im Feld), sonst Gerätefenster */
-  M.openCode = function (txt) {
-    var g = M.findByCode(txt);
-    if (!g) { M.toast('Unbekannter Code: ' + String(txt).slice(0, 60), 'err'); return false; }
+  /* Gerät anzeigen: Karte mit Panel (im Feld), sonst Gerätefenster */
+  M.showDevice = function (gid) {
+    var g = M.idx().ger[gid]; if (!g) return;
     var i = M.info(g.id);
     var target = i.mccTs && !i.isMag ? i.mccTs.id : g.id;
     M.state.drawer = null; M.renderDrawer && M.renderDrawer();
@@ -83,8 +82,68 @@
       history.replaceState(null, '', '#' + M.state.view);
       M.openDrawer(g.id);
     }
+  };
+  /* Code (Scan oder Link #g=…) → Schnellaktionen */
+  M.openCode = function (txt) {
+    var g = M.findByCode(txt);
+    if (!g) { M.toast('Unbekannter Code: ' + String(txt).slice(0, 60), 'err'); return false; }
+    if (/^#g=/.test(location.hash)) history.replaceState(null, '', '#' + M.state.view);
+    M.openScanAktionen(g.id);
     return true;
   };
+  var IC = {
+    gps: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2.2" class="f"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg>',
+    mag: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 4l9 6.5V20H3z"/><path d="M7.5 20v-6h9v6M7.5 17h9"/></svg>',
+    edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5l4 4L8 20H4v-4z"/><path d="M13 7l4 4"/></svg>'
+  };
+  M.openScanAktionen = function (gid) {
+    var I = M.idx(), g = I.ger[gid]; if (!g) return;
+    var i = M.info(gid), ts = i.mccTs && !i.isMag ? i.mccTs : null, base = ts || g, bi = ts ? M.info(ts.id) : i;
+    var imFeld = !!(bi.cur && bi.cur.ort === 'feld');
+    M.ctx = { kind: 'scanakt', gid: gid, base: base.id };
+    var sub = (i.kat ? i.kat.name : M.typLabel[g.typ]) + (g.seriennummer ? ' · SN ' + g.seriennummer : '');
+    var wo = esc(bi.ortText || 'ohne Standort') + (bi.proj ? ' · <b>' + esc(M.projName(bi.proj)) + '</b>' : '') + (bi.cur && bi.cur.von ? ' · seit ' + M.fmtDate(bi.cur.von) : '');
+    var gpsSub = imFeld ? 'Position übernehmen' + (bi.proj ? ', Projekt bleibt' : '') : 'Projekt und Position wählen';
+    var b = '<div class="sa-head">' + M.symbol(gid, 44) + '<div><b>' + esc(g.name) + '</b><span>' + esc(sub) + '</span>' +
+      '<span class="sa-wo">' + wo + '</span>' + (ts ? '<span class="sa-ts">Gehört zu ' + esc(ts.name) + ' – Standort und Magazin gelten für beide.</span>' : '') + '</div></div>' +
+      '<div class="sa-grid">' +
+      '<button type="button" class="sa-btn" data-act="sa-gps" id="sa-gps">' + IC.gps + '<b>Hier platzieren</b><span>GPS · ' + gpsSub + '</span></button>' +
+      '<button type="button" class="sa-btn" data-act="sa-mag"' + (bi.isMag ? ' disabled' : '') + '>' + IC.mag + '<b>Ins Magazin</b><span>' + (bi.isMag ? 'steht schon im Magazin' : 'zurückbuchen') + '</span></button>' +
+      '<button type="button" class="sa-btn" data-act="sa-edit">' + IC.edit + '<b>Bearbeiten</b><span>Gerätedaten ändern</span></button>' +
+      '</div><p class="sa-msg" id="sa-msg" aria-live="polite"></p>';
+    M.modal({ title: 'Gescannt', form: 'scanakt', body: b, noFocus: true,
+      foot: '<button type="button" class="btn ghost" data-act="sa-show">Details anzeigen</button><span class="grow"></span><button type="button" class="btn ghost" data-act="modal-close">Schliessen</button>' });
+  };
+  function saGps() {
+    var c = M.ctx; if (!c || c.kind !== 'scanakt') return;
+    var base = c.base, bi = M.info(base), btn = $('sa-gps'), m = $('sa-msg');
+    if (!navigator.geolocation) { m.textContent = 'Dieses Gerät liefert keinen Standort.'; m.className = 'sa-msg err'; return; }
+    btn.disabled = true; btn.classList.add('busy'); m.className = 'sa-msg'; m.textContent = 'Standort wird ermittelt …';
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      if (!M.ctx || M.ctx.kind !== 'scanakt') return;
+      var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = Math.round(pos.coords.accuracy || 0);
+      if (bi.cur && bi.cur.ort === 'feld') {
+        M.closeModal();
+        Promise.resolve(M.setPos(base, lat, lng)).then(function () {
+          M.refreshUI && M.refreshUI();
+          M.go('karte', false); history.replaceState(null, '', '#karte');
+          setTimeout(function () { M.select(base); M.mapFocus(base); }, 80);
+          M.toast(M.idx().ger[base].name + ': Position gesetzt (GPS ± ' + acc + ' m)' + (acc > 30 ? ' – ungenau, bei Bedarf auf der Karte korrigieren' : ''));
+        });
+      } else {
+        M.openMove([base]);
+        if (!$('mv-ort')) return;
+        M.locSetOrt('mv', 'feld');
+        M.locFill('mv', lat, lng, 'GPS ± ' + acc + ' m');
+        M.movePreview && M.movePreview();
+        var s = $('mv-proj'); if (s) setTimeout(function () { s.focus(); }, 60);
+      }
+    }, function (e) {
+      btn.disabled = false; btn.classList.remove('busy');
+      m.className = 'sa-msg err';
+      m.textContent = e && e.code === 1 ? 'Kein Zugriff auf den Standort. In den Einstellungen für den Browser erlauben.' : 'Standort nicht verfügbar. Draussen nochmals versuchen.';
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 });
+  }
 
   /* ---------- Gerätename auf Platz bringen (eine oder zwei Zeilen) */
   function fitName(doc, F, name) {
@@ -388,6 +447,10 @@
       $('sc-code').value = '';
       scan ? (delete scan.last[g.qr || g.id], onCode(g.qr || g.id)) : M.openCode(g.qr || g.id);
     },
+    'sa-gps': function () { saGps(); },
+    'sa-mag': function () { var c = M.ctx; if (c && c.kind === 'scanakt') M.openMove([c.base], true); },
+    'sa-edit': function () { var c = M.ctx; if (c && c.kind === 'scanakt') M.openGeraet(c.gid); },
+    'sa-show': function () { var c = M.ctx; if (c && c.kind === 'scanakt') { var id = c.gid; M.closeModal(); M.showDevice(id); } },
     'scan-go': function (d) {
       var ids = scan ? scan.list.slice() : [];
       if (!ids.length) return;

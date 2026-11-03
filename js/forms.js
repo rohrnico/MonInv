@@ -222,6 +222,7 @@
   /* Amortisation an diesem Standort: frei wählbarer Betrag pro Monat oder pauschal */
   function amortFields(p, a) {
     var modus = a.modus === 'pauschal' ? 'pauschal' : 'monat';
+    if (!a.edit) return '';   // eigener Betrag entfällt: Amortisation läuft über die Offertposition (nur Korrektur in der Historie)
     var off = !(M.num(a.betrag) > 0);   // eigener Betrag nur noch für bestehende Einsätze – sonst über die Offertposition
     return '<div class="amort-box" id="' + p + '-abox"' + (off ? ' data-off="1" hidden' : '') + '><span class="lbl">Eigener Amortisationsbetrag (ohne Offertposition)</span><input type="hidden" id="' + p + '-amodus" value="' + modus + '">' +
       '<div class="row-in"><span class="chf">CHF</span><input id="' + p + '-amort" value="' + esc(M.has(a.betrag) ? a.betrag : '') + '" inputmode="decimal" class="r" aria-label="Betrag CHF" placeholder="' + esc(a.placeholder || '0') + '">' +
@@ -1000,7 +1001,7 @@
     var g = M.idx().ger[e.geraetId];
     M.ctx = { kind: 'einsatz', eid: eid };
     var b = '<div class="mv-from">' + M.symbol(g.id, 32) + '<div><b>' + esc(g.name) + '</b><span>Einsatz korrigieren</span></div></div>' +
-      locFields('el', e, { later: false, amort: { modus: e.amortModus, betrag: e.amortBetrag } }) + '<div class="grid2">' +
+      locFields('el', e, { later: false, amort: { edit: true, modus: e.amortModus, betrag: e.amortBetrag } }) + '<div class="grid2">' +
       fld('Von', inp('e-von', e.von, 'type="date" required data-change="plan-in" data-p="el"')) +
       fld('Bis (leer = laufend)', inp('e-bis', e.bis, 'type="date"')) +
       fld('Ortsbezeichnung', inp('e-ortname', e.ortName, 'maxlength="80" placeholder="wird aus der Position ermittelt"')) +
