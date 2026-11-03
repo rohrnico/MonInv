@@ -8,7 +8,9 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.4.8';
+  M.VERSION = '0.4.9';
+  /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
+  M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
   /* ---------- Hilfen */
   function pad(n) { return (n < 10 ? '0' : '') + n; }

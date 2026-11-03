@@ -70,6 +70,14 @@ Wer im Testbetrieb schon echte Geräte erfasst hat: dort unter Einstellungen **S
 
 **Auf dem Handy:** Adresse im Browser öffnen › Teilen › «Zum Home-Bildschirm». Die App öffnet dann wie eine normale App. «Position setzen › Mein Standort (GPS)» funktioniert, weil die Seite über https läuft.
 
+**Bedienung auf dem Handy** (bis 760 px Breite, eigene Gestaltung in `css/mobile.css` und `js/mobile.js`; auf dem PC ändert sich nichts):
+- **Karte:** oben «Filter» (Zahl = aktive Filter) und Kartenhintergrund, unten rechts «Alle zeigen», «Kabel» und «Gerät platzieren». Unten liegt ein **Blatt**: zugeklappt zeigt es die Übersicht bzw. das angetippte Gerät, am Griff antippen oder nach oben wischen öffnet es, nach unten wischen schliesst es (bei einem Gerät: Auswahl aufheben). Ein angetipptes Gerät bleibt über dem Blatt sichtbar. Zoomen mit zwei Fingern.
+- **Platzieren und Kabel zeichnen:** Die Leiste mit LV95, GPS und Adresssuche steht unten, oben bleibt die Karte frei zum Tippen.
+- **Inventar und Tachymeter:** Geräte als Karten statt breiter Tabelle (Name, Kategorie, Zustand, Standort, Projekt, Restwert bzw. MCC und Wartung). Suche immer sichtbar, übrige Filter unter «Filter». Ausgewählte Geräte: die Leiste mit den Aktionen bleibt oben stehen und lässt sich seitlich wischen. CSV-Import und Excel-Export gibt es auf dem Handy unter Einstellungen › Daten.
+- **Projekte:** zuerst die Liste, ein Tipp öffnet das Projekt, «‹ Alle Projekte» (oder nochmals unten auf «Projekte») führt zurück. Breite Tabellen (Positionen, Abrechnung, Zeitachse) lassen sich seitlich wischen.
+- **Dialoge und Gerätefenster** öffnen im Vollbild; die Knöpfe (Speichern, Abbrechen) stehen fest unten, die Aktionen im Gerätefenster in einer wischbaren Zeile.
+- Eingabefelder haben 16 px Schrift, damit das iPhone beim Tippen nicht hineinzoomt; Notch und Home-Balken werden freigehalten.
+
 ---
 
 ### Anmeldung und Zugriff
@@ -131,7 +139,7 @@ Der lokale Testmodus hat keine Anmeldung; die Daten liegen dort nur im eigenen B
 
 ## 4. Erweitern
 
-**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.4.8**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.4.8`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden».
+**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.4.9**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.4.9`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden».
 
 
 **Neue Attribute ohne Programmieren:** Einstellungen › Kategorien › Kategorie öffnen › **Zusatzfelder** (Text, Zahl, Datum). Die Felder erscheinen sofort in der Maske, im Detail und im Excel-Export.
@@ -147,6 +155,7 @@ Der lokale Testmodus hat keine Anmeldung; die Daten liegen dort nur im eigenen B
 index.html          Gerüst der App
 config.js           Datenquelle (lokal / SharePoint)
 css/app.css         Gestaltung (RISTAG-Farben, Exo 2)
+css/mobile.css      Handy-Darstellung (bis 760 px)
 js/symbols.js       Gruppen, Farben, Piktogramme
 js/store.js         Speicher: Browser oder SharePoint (Microsoft Graph)
 js/import.js        CSV-Import der Geräte
@@ -157,6 +166,7 @@ js/map.js           Karte, swisstopo-Ebenen, Zusammenfassen
 js/views.js         Ansichten (Karte, Inventar, Tachymeter, Projekte, Einstellungen)
 js/forms.js         Masken
 js/app.js           Start, Navigation, Export/Import
+js/mobile.js        Handy: Kartenblatt (Tippen/Wischen), Kartenränder, Tastatur
 js/beispiel.js      Beispieldaten für den Testbetrieb
 vendor/             Leaflet 1.9.4, Leaflet.markercluster 1.5.3, MSAL Browser 2.39.0,
                     jsPDF 2.5.1, qrcode-generator 1.4.4, jsQR 1.4.0, Schrift Exo 2 ExtraBold (fonts/)

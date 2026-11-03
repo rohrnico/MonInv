@@ -41,6 +41,7 @@
 
   M.go = function (view, push) {
     if (VIEWS.indexOf(view) < 0) view = 'karte';
+    if (view === 'projekte' && M.state.view === 'projekte') M.state.projMob = null;   // zweiter Tipp auf «Projekte» = zurück zur Liste
     M.state.view = view;
     if (view !== 'karte') { M.state.placing = null; M.state.drawing = null; }
     if (push !== false && location.hash !== '#' + view) history.replaceState(null, '', '#' + view);
@@ -470,7 +471,7 @@
     },
     'map-goto': function (d) { M.mapFocusPoint(+d.lat, +d.lng, 18); var r = $('pl-res'); if (r) r.innerHTML = ''; },
     'show-map': function (d) { M.state.drawer = null; M.go('karte'); M.select(d.id); setTimeout(function () { M.mapFocus(d.id); }, 120); },
-    'toggle-grp': function (d) { var f = M.state.filters.map; f.off[d.k] = !f.off[d.k]; M.renderMapSide(); M.mapUpdate(); },
+    'toggle-grp': function (d) { var f = M.state.filters.map; f.off[d.k] = !f.off[d.k]; M.renderMapSide(); M.renderMapTools(); M.mapUpdate(); },
     'toggle-kabel': function () { var f = M.state.filters.map; f.kabel = !f.kabel; M.renderMapSide(); M.mapRedrawKabel(); },
     'layer': function (d) { M.mapLayer(d.k); },
     'fit': function () { M.mapFitAll(); },
@@ -509,7 +510,12 @@
     'edit-kat': function (d) { M.openKategorie(d.id); },
     'new-proj': function () { M.openProjekt(null); },
     'edit-proj': function (d) { M.openProjekt(d.id); },
-    'proj-sel': function (d) { M.state.projSel = d.id; M.renderProjekte(); },
+    'proj-sel': function (d) {
+      M.state.projSel = d.id; M.state.projMob = 'detail'; M.renderProjekte();
+      if (M.isMobile()) { var pg = document.querySelector('#v-projekte .page'); if (pg) pg.scrollTop = 0; }
+    },
+    'proj-back': function () { M.state.projMob = null; M.renderProjekte(); var pg = document.querySelector('#v-projekte .page'); if (pg) pg.scrollTop = 0; },
+    'inv-filt': function () { M.state.invFiltOpen = !M.state.invFiltOpen; M.renderInventar(); },
     'projf': function (d) { M.state.filters.proj.status = d.k; M.state.projSel = null; M.renderProjekte(); },
     'proj-map': function (d) {
       var p = M.idx().proj[d.id];
@@ -636,6 +642,7 @@
     'mapf': function (d, el) {
       var f = M.state.filters.map;
       f[d.k] = el.type === 'checkbox' ? el.checked : el.value;
+      M.renderMapTools();
       M.mapUpdate();
       if (d.k === 'projekt' && el.value) setTimeout(M.mapFitAll, 50);
     },

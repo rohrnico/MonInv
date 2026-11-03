@@ -66,7 +66,7 @@
       if (M.state.placing) { M.placeAt(a.latlng.lat, a.latlng.lng); return; }
       if (M.state.drawing) { M.drawAdd(a.latlng.lat, a.latlng.lng, null); return; }
       if (close || map.getZoom() >= 19) M.showStack(kids.map(function (m) { return m.options.gid; }));
-      else a.layer.zoomToBounds({ padding: [40, 40] });
+      else a.layer.zoomToBounds(pad(40));
     });
     map.on('click', function (e) {
       if (M.state.placing) { M.placeAt(e.latlng.lat, e.latlng.lng); return; }
@@ -156,7 +156,7 @@
     renderDraw();
     if (!fitted && list.length) {
       fitted = true;
-      map.fitBounds(cluster.getBounds(), { padding: [40, 40], maxZoom: 13 });
+      map.fitBounds(cluster.getBounds(), pad(40, { maxZoom: 13 }));
     }
   };
 
@@ -167,17 +167,38 @@
   };
   M.mapRedrawKabel = function () { if (map) drawKabel(); };
 
+  /* Ränder für fitBounds: auf dem Handy oben die Werkzeuge, unten das Blatt freihalten */
+  function pad(n, o) {
+    o = o || {};
+    var e = M.mapEdges ? M.mapEdges() : null;
+    o.paddingTopLeft = [n, n + (e ? e.top : 0)];
+    o.paddingBottomRight = [n, n + (e ? e.bottom : 0)];
+    return o;
+  }
+  /* Gerät nach dem Antippen nicht unter dem Blatt verstecken */
+  M.mapKeepVisible = function (gid) {
+    var m = markers[gid], e = M.mapEdges ? M.mapEdges() : null;
+    if (!map || !m || !e || !map.hasLayer(m)) return;
+    var p = map.latLngToContainerPoint(m.getLatLng()), h = map.getSize().y, free = h - e.bottom;
+    if (p.y > free - 30 || p.y < e.top + 20) map.panBy([0, p.y - (e.top + (free - e.top) / 2)], { animate: !calm(), duration: 0.35 });
+  };
+  /* Auf dem Handy deckt das Detailblatt den unteren Teil der Karte ab: Ziel so verschieben, dass es mitten im sichtbaren Teil steht */
+  function shifted(ll, z) {
+    var oy = M.mapOffsetY ? M.mapOffsetY() : 0;
+    if (!oy) return L.latLng(ll);
+    return map.unproject(map.project(ll, z).add([0, oy]), z);
+  }
   M.mapFocus = function (gid) {
     if (!map) return;
     var m = markers[gid];
-    if (m) { cluster.zoomToShowLayer(m, function () { map.panTo(m.getLatLng(), { animate: !calm(), duration: 0.5 }); }); return; }
+    if (m) { cluster.zoomToShowLayer(m, function () { map.panTo(shifted(m.getLatLng(), map.getZoom()), { animate: !calm(), duration: 0.5 }); }); return; }
     var i = M.info(gid);
     if (i && i.mccTs) return M.mapFocus(i.mccTs.id);
-    if (i && i.pos) map.setView([i.pos.lat, i.pos.lng], Math.max(map.getZoom(), 16));
+    if (i && i.pos) { var z = Math.max(map.getZoom(), 16); map.setView(shifted([i.pos.lat, i.pos.lng], z), z); }
   };
   M.mapFocusKabel = function (kid) {
     var k = M.idx().kab[kid];
-    if (map && k && k.punkte && k.punkte.length) map.fitBounds(L.latLngBounds(k.punkte), { padding: [60, 60], maxZoom: 19 });
+    if (map && k && k.punkte && k.punkte.length) map.fitBounds(L.latLngBounds(k.punkte), pad(60, { maxZoom: 19 }));
   };
   var calm = function () { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; };
   M.mapFocusPoint = function (lat, lng, z) {
@@ -186,12 +207,12 @@
     if (calm() || !near) map.setView([lat, lng], z || 16); else map.flyTo([lat, lng], z || 16, { duration: 0.6 });
   };
   M.mapCenter = function () { if (!map) return null; var c = map.getCenter(); return { lat: c.lat, lng: c.lng }; };
-  M.mapFitAll = function () { if (map && cluster.getLayers().length) map.fitBounds(cluster.getBounds(), { padding: [40, 40], maxZoom: 15 }); };
+  M.mapFitAll = function () { if (map && cluster.getLayers().length) map.fitBounds(cluster.getBounds(), pad(40, { maxZoom: 15 })); };
   M.mapFitIds = function (ids) {
     if (!map) return;
     var pts = ids.map(function (id) { var i = M.info(id); return i && i.pos ? [i.pos.lat, i.pos.lng] : null; }).filter(Boolean);
     if (pts.length === 1) map.setView(pts[0], Math.max(map.getZoom(), 18));
-    else if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: 19 });
+    else if (pts.length) map.fitBounds(L.latLngBounds(pts), pad(60, { maxZoom: 19 }));
   };
   M.mapSetMode = function (mode) {
     var el = document.getElementById('map');
@@ -200,6 +221,7 @@
     el.classList.toggle('is-drawing', mode === 'draw');
     if (map) { if (mode === 'draw') map.doubleClickZoom.disable(); else map.doubleClickZoom.enable(); }
   };
+  M.mapObj = function () { return map; };
   M.mapInvalidate = function () { if (map) setTimeout(function () { map.invalidateSize(); }, 60); };
 
   /* ---------- Kabel zeichnen */
