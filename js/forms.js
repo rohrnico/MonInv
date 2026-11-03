@@ -4,9 +4,10 @@
   var M = window.M, S = window.MonSym, esc = M.esc;
 
   function $(id) { return document.getElementById(id); }
-  function val(id) { var el = $(id); return el ? el.value.trim() : ''; }
+  function val(id) { var el = $(id); return el && el.value !== '__neu' ? el.value.trim() : ''; }
   function opt(v, label, sel) { return '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(label) + '</option>'; }
   function fld(label, inner, cls) { return '<label class="fld ' + (cls || '') + '"><span>' + label + '</span>' + inner + '</label>'; }
+  function sec(t) { return '<h3 class="fsec">' + t + '</h3>'; }
   function inp(id, v, attrs) { return '<input id="' + id + '" value="' + esc(v === null || v === undefined ? '' : v) + '" ' + (attrs || '') + '>'; }
 
   /* ---------- Rahmen */
@@ -59,13 +60,53 @@
       '<div id="' + p + '-mag"' + (ort === 'magazin' ? '' : ' hidden') + '>' + fld('Magazin', '<select id="' + p + '-magsel">' + M.magOptions(init.magazinId) + '</select>') + '</div>' +
       '</fieldset>' +
       '<fieldset class="extra loc"><legend>Projekt</legend>' +
-      '<div class="grid2">' + fld('Projekt (optional)', '<select id="' + p + '-proj" data-change="loc-proj" data-p="' + p + '"' + (ort === 'magazin' ? ' disabled' : '') + '>' + M.projOptions(init.projektId || '', true, '– kein Projekt –') + '</select>') +
-      fld('Auftragsnummer / Teilprojekt', '<input id="' + p + '-auftrag" list="auftrag-list" maxlength="40" value="' + esc(init.auftrag || '') + '" placeholder="z.B. 26160-03"' + (ort === 'magazin' ? ' disabled' : '') + '>' + M.auftragList()) + '</div>' +
-      M.planBoxHtml(p, init, ort === 'magazin') +
+      '<div class="grid2">' + M.projSelHtml(p, init.projektId || '', ort === 'magazin') +
+      fld('Auftragsnummer / Teilprojekt', '<input id="' + p + '-auftrag" list="auftrag-list" maxlength="40" value="' + esc(init.auftrag || '') + '" placeholder="z.B. 26160-03"' + (ort === 'magazin' ? ' disabled' : '') + '>' + M.auftragList()) + '</div>' + M.newProjBox(p) +
       '<div id="' + p + '-posbox" class="posbox">' + (ort === 'magazin' ? '' : M.posBoxHtml(p, init.projektId, init, opts.n || 1)) + '</div>' +
+      M.planBoxHtml(p, init, ort === 'magazin') +
       '<p class="muted small" id="' + p + '-projhint">' + (ort === 'magazin' ? 'Im Magazin läuft kein Projekt.' : 'Für Abrechnung und Projekthistorie. Der Standort oben bleibt davon unabhängig.') + '</p></fieldset>';
     return h;
   }
+  /* Projektauswahl mit «＋ Neues Projekt …» direkt im Dialog */
+  M.NEU_PROJ = '__neu';
+  M.projSelHtml = function (p, sel, disabled) {
+    return fld('Projekt (optional)', '<select id="' + p + '-proj" data-change="loc-proj" data-p="' + p + '" data-prev="' + esc(sel || '') + '"' + (disabled ? ' disabled' : '') + '>' +
+      M.projOptions(sel || '', true, '– kein Projekt –') + '<option value="' + M.NEU_PROJ + '">＋ Neues Projekt …</option></select>');
+  };
+  M.newProjBox = function (p) {
+    return '<div class="np-box" id="' + p + '-np" hidden><div class="np-h">Neues Projekt anlegen</div><div class="np-row">' +
+      fld('Auftrags-Nr.', inp(p + '-np-nr', '', 'maxlength="30" placeholder="z.B. 26160" data-enter="np-add" data-p="' + p + '"')) +
+      fld('Name', inp(p + '-np-name', '', 'maxlength="80" placeholder="z.B. Baugrube Bahnhofplatz" data-enter="np-add" data-p="' + p + '"')) +
+      '<div class="np-btns"><button type="button" class="btn ghost sm" data-act="np-cancel" data-p="' + p + '">Abbrechen</button>' +
+      '<button type="button" class="btn sm" data-act="np-add" data-p="' + p + '">Anlegen</button></div></div>' +
+      '<p class="form-err" id="' + p + '-np-err" role="alert"></p></div>';
+  };
+  M.newProjShow = function (p, on) {
+    var bx = $(p + '-np'); if (!bx) return;
+    bx.hidden = !on;
+    if (on) { $(p + '-np-err').textContent = ''; setTimeout(function () { var n = $(p + '-np-nr'); if (n) n.focus(); }, 30); }
+  };
+  M.newProjAdd = function (p) {
+    var nr = val(p + '-np-nr'), name = val(p + '-np-name');
+    if (!name) { $(p + '-np-err').textContent = 'Bitte einen Projektnamen eingeben.'; $(p + '-np-name').focus(); return; }
+    var dup = M.state.data.projekte.find(function (x) { return x.typ === 'projekt' && nr && x.nummer === nr; });
+    if (dup) { $(p + '-np-err').textContent = 'Auftragsnummer ' + nr + ' gibt es schon: ' + M.projName(dup) + '.'; return; }
+    var pr = { id: M.uid('prj'), nummer: nr, name: name, typ: 'projekt', status: 'aktiv', lat: null, lng: null };
+    return M.put('projekte', pr).then(function () {
+      var s = $(p + '-proj'); if (!s) return;
+      s.innerHTML = M.projOptions(pr.id, true, '– kein Projekt –') + '<option value="' + M.NEU_PROJ + '">＋ Neues Projekt …</option>';
+      s.value = pr.id; s.setAttribute('data-prev', pr.id);
+      $(p + '-np-nr').value = ''; $(p + '-np-name').value = '';
+      M.newProjShow(p, false);
+      M.CHANGE['loc-proj']({ p: p }, s);
+      M.toast('Projekt «' + M.projName(pr) + '» angelegt');
+    });
+  };
+  M.newProjCancel = function (p) {
+    var s = $(p + '-proj'); if (s) s.value = s.getAttribute('data-prev') || '';
+    M.newProjShow(p, false);
+  };
+
   /* Geplante Laufzeit: Monate (ab Einsatzbeginn) oder bis Datum */
   M.planBoxHtml = function (p, init, hidden) {
     init = init || {};
@@ -116,34 +157,73 @@
   /* Offertposition und Set wählen (ersetzt den Amortisationsbetrag) */
   M.posBoxHtml = function (p, projektId, sel, n) {
     sel = sel || {};
-    if (!projektId) return '';
+    if (!projektId || projektId === M.NEU_PROJ) return '';
     var I = M.idx(), ps = I.posByProj[projektId] || [];
-    if (!ps.length) return '<p class="muted small">Für dieses Projekt sind noch keine Offertpositionen erfasst (Projekte › Offerte &amp; Positionen). Bis dahin gilt der Betrag unter «Amortisation».</p>';
     var pid = sel.positionId && I.pos[sel.positionId] ? sel.positionId : '';
     var P = pid ? I.pos[pid] : null;
-    var h = fld('Offertposition', '<select id="' + p + '-pos" data-change="loc-pos" data-p="' + p + '">' + opt('', '– keine Position (Einzelansatz) –', !pid) +
+    var h = fld('Offertposition', '<select id="' + p + '-pos" data-change="loc-pos" data-p="' + p + '" data-prev="' + pid + '">' +
+      opt('', ps.length ? '– keine Position –' : '– noch keine Positionen –', !pid) +
       M.ABR_ORDER.map(function (g) {
         var arr = ps.filter(function (x) { return (x.gruppe || 'sen') === g; });
-        return arr.length ? '<optgroup label="' + esc(M.ABR_GRUPPEN[g].n) + '">' + arr.map(function (x) { return opt(x.id, (x.nr ? x.nr + ' · ' : '') + x.text + (x.art === 'set' ? ' (Set-Preis)' : ' (Stückpreis)'), x.id === pid); }).join('') + '</optgroup>' : '';
-      }).join('') + '</select>');
+        return arr.length ? '<optgroup label="' + esc(M.ABR_GRUPPEN[g].n) + '">' + arr.map(function (x) { return opt(x.id, (x.nr ? x.nr + ' · ' : '') + x.text + (x.art === 'set' ? ' (Set)' : ''), x.id === pid); }).join('') + '</optgroup>' : '';
+      }).join('') + '<option value="' + M.NEU_PROJ + '">＋ Neue Offertposition …</option></select>');
     if (P && P.art === 'set') {
       var units = M.posUnits(P.id).list.filter(function (u) { return u.aktiv; });
       var curKey = sel.einheit ? 'S:' + sel.einheit : null;
       h += fld('Set', '<select id="' + p + '-einheit">' + opt('neu', n > 1 ? 'Neues Set aus diesen ' + n + ' Geräten' : 'Neues Set', !curKey) +
         units.map(function (u) { return opt(u.key.slice(2), M.unitLabel(P, u), u.key === curKey); }).join('') + '</select>');
     }
-    if (P) h += '<p class="muted small pos-hint">Preis pro ' + (P.art === 'set' ? 'Set' : 'Gerät') + ' und Monat: Vorhalten CHF ' + M.chf(P.V) + ' · Betrieb CHF ' + M.chf(P.B) + ' · Wartung CHF ' + M.chf(P.W) +
-      '. Das Vorhalten fliesst in die Amortisation' + (P.art === 'set' ? ', verteilt nach Anschaffungswert auf die Geräte im Set' : '') + '. Ein Monat zählt ganz, wenn das Gerät mehr als 10 Tage darin steht, sonst gar nicht.' + (P.auftrag ? ' Auftrag ' + esc(P.auftrag) + '.' : '') + '</p>';
+    if (P) h += '<div class="pos-chips"><span><i>Vorhalten</i>' + M.chf(P.V) + '</span><span><i>Betrieb</i>' + M.chf(P.B) + '</span><span><i>Wartung</i>' + M.chf(P.W) + '</span><em>CHF pro ' + (P.art === 'set' ? 'Set' : 'Gerät') + ' und Monat</em></div>';
+    else if (!ps.length) h += '<p class="muted small pos-hint">Position direkt hier erfassen – oder später unter Projekte › Offerte &amp; Positionen.</p>';
+    h += M.newPosBox(p);
     return h;
+  };
+  M.newPosBox = function (p) {
+    var gid = M.ctx && (M.ctx.gid || (M.ctx.gids && M.ctx.gids[0]));
+    var gr = gid ? M.abrGruppeOf(gid) : 'sen';
+    var num = function (k, l) { return fld(l, '<div class="unit-in"><input id="' + p + '-np' + k + '" inputmode="decimal" class="r" placeholder="0" data-enter="npos-add" data-p="' + p + '"><i>CHF</i></div>'); };
+    return '<div class="np-box npos-box" id="' + p + '-npos" hidden><div class="np-h">Neue Offertposition</div>' +
+      '<div class="npos-g1">' + fld('Pos.', inp(p + '-npnr', '', 'maxlength="12" placeholder="1.1" data-enter="npos-add" data-p="' + p + '"')) +
+      fld('Bezeichnung', inp(p + '-nptext', '', 'maxlength="120" placeholder="z.B. Automatisches Tachymeter inkl. MCC" data-enter="npos-add" data-p="' + p + '"')) + '</div>' +
+      '<div class="npos-g2">' + fld('Gruppe', '<select id="' + p + '-npgr">' + M.ABR_ORDER.map(function (g) { return opt(g, M.ABR_GRUPPEN[g].n, g === gr); }).join('') + '</select>') +
+      fld('Preis gilt', '<select id="' + p + '-npart">' + opt('stk', 'pro Gerät', true) + opt('set', 'pro Set', false) + '</select>') + '</div>' +
+      '<div class="npos-g3">' + num('V', 'Vorhalten / Mt.') + num('B', 'Betrieb / Mt.') + num('W', 'Wartung / Mt.') + '</div>' +
+      '<p class="form-err" id="' + p + '-npos-err" role="alert"></p>' +
+      '<div class="np-btns end"><button type="button" class="btn ghost sm" data-act="npos-cancel" data-p="' + p + '">Abbrechen</button>' +
+      '<button type="button" class="btn sm" data-act="npos-add" data-p="' + p + '">Position anlegen</button></div></div>';
+  };
+  M.newPosShow = function (p, on) {
+    var bx = $(p + '-npos'); if (!bx) return;
+    bx.hidden = !on;
+    if (on) { $(p + '-npos-err').textContent = ''; setTimeout(function () { var n = $(p + '-npnr'); if (n) n.focus(); }, 30); }
+  };
+  M.newPosCancel = function (p) {
+    var s = $(p + '-pos'); if (s) s.value = s.getAttribute('data-prev') || '';
+    M.newPosShow(p, false);
+  };
+  M.newPosAdd = function (p) {
+    var projektId = val(p + '-proj'), err = $(p + '-npos-err');
+    var d = { id: M.uid('pos'), projektId: projektId, nr: val(p + '-npnr'), text: val(p + '-nptext'), gruppe: val(p + '-npgr') || 'sen', art: val(p + '-npart') === 'set' ? 'set' : 'stk', offMonate: '', bemerkung: '' };
+    ['V', 'B', 'W'].forEach(function (k) { var x = M.num(val(p + '-np' + k)); d[k] = x === null ? (k === 'V' ? '' : 0) : x; });
+    if (!projektId) { err.textContent = 'Zuerst ein Projekt wählen.'; return; }
+    if (!d.text) { err.textContent = 'Bitte die Bezeichnung eingeben.'; $(p + '-nptext').focus(); return; }
+    if (d.V === '') { err.textContent = 'Bitte den Preis für Vorhalten eingeben (0 ist möglich).'; $(p + '-npV').focus(); return; }
+    return M.put('positionen', d).then(function () {
+      var bx = $(p + '-posbox'); if (!bx) return;
+      bx.innerHTML = M.posBoxHtml(p, projektId, { positionId: d.id }, (M.ctx && M.ctx.n) || 1); M.posSync(p);
+      if (M.ctx && M.ctx.kind === 'move') M.movePreview();
+      M.toast('Position ' + (d.nr ? d.nr + ' ' : '') + '«' + d.text + '» angelegt');
+    });
   };
   M.posSync = function (p) {
     var on = !!($(p + '-pos') && val(p + '-pos'));
-    var box = $(p + '-abox'); if (box) box.hidden = on;
+    var box = $(p + '-abox'); if (box) box.hidden = on || box.getAttribute('data-off') === '1';
   };
   /* Amortisation an diesem Standort: frei wählbarer Betrag pro Monat oder pauschal */
   function amortFields(p, a) {
     var modus = a.modus === 'pauschal' ? 'pauschal' : 'monat';
-    return '<div class="amort-box" id="' + p + '-abox"><span class="lbl">Amortisation an diesem Standort</span><input type="hidden" id="' + p + '-amodus" value="' + modus + '">' +
+    var off = !(M.num(a.betrag) > 0);   // eigener Betrag nur noch für bestehende Einsätze – sonst über die Offertposition
+    return '<div class="amort-box" id="' + p + '-abox"' + (off ? ' data-off="1" hidden' : '') + '><span class="lbl">Eigener Amortisationsbetrag (ohne Offertposition)</span><input type="hidden" id="' + p + '-amodus" value="' + modus + '">' +
       '<div class="row-in"><span class="chf">CHF</span><input id="' + p + '-amort" value="' + esc(M.has(a.betrag) ? a.betrag : '') + '" inputmode="decimal" class="r" aria-label="Betrag CHF" placeholder="' + esc(a.placeholder || '0') + '">' +
       '<div class="seg" role="group" aria-label="Art der Amortisation">' +
       '<button type="button" data-act="amort-mode" data-p="' + p + '" data-k="monat" class="' + (modus === 'monat' ? 'on' : '') + '" aria-pressed="' + (modus === 'monat') + '">pro Monat</button>' +
@@ -289,7 +369,7 @@
         return '<button type="button" class="' + (t === k ? 'on' : '') + '" data-act="g-typ" data-k="' + k + '">' + M.typLabel[k] + '</button>';
       }).join('') + '</div>';
     }
-    b += '<div class="grid2">';
+    b += sec('Gerät') + '<div class="grid2">';
     b += fld(t === 'mcc' ? 'Bezeichnung' : (t === 'tachymeter' ? 'Nummer' : 'Name'), inp('g-name', d.name, 'required maxlength="60" placeholder="' + (t === 'mcc' ? 'z.B. SN 41207' : t === 'tachymeter' ? 'z.B. TS-12' : 'z.B. IN-11') + '"'));
     if (t === 'sensor') {
       b += '<div class="fld"><label for="g-kat">Kategorie · wählen oder neu</label><div class="row-in"><select id="g-kat" data-change="g-kat">' + katOptions(d.kategorieId, 'sensor') + '</select>' +
@@ -299,10 +379,6 @@
     }
     b += fld('Hersteller', inp('g-her', d.hersteller, 'maxlength="60"'));
     b += fld('Seriennummer', inp('g-sn', d.seriennummer, 'maxlength="60"'));
-    b += fld('Kaufdatum', inp('g-kauf', d.kaufdatum, 'type="date"'));
-    b += fld('Anschaffungswert CHF', inp('g-wert', d.wert, 'inputmode="decimal" class="r"'));
-    b += fld('Bereits amortisiert vor Erfassung CHF', inp('g-vor', d.amortVor, 'inputmode="decimal" class="r" placeholder="0"'));
-    b += fld('Stand per (Datum)', inp('g-vordat', d.amortVorDatum || (gid ? '' : M.today()), 'type="date"'));
     if (t !== 'tachymeter' || d.sim) {
       var hasSim = !!d.sim;
       b += '<div class="fld"><span class="lbl">SIM-Karte</span><div class="row-in">' +
@@ -315,6 +391,12 @@
         '<button type="button" class="btn ghost sm" data-act="pw-toggle" data-for="g-wlan">Zeigen</button></div></div>';
     }
     if (t === 'tachymeter') b += mccSelect('g-mcc', gid, d.mccId);
+    b += '</div>' + sec('Wert & Amortisation') + '<div class="grid2">';
+    b += fld('Kaufdatum', inp('g-kauf', d.kaufdatum, 'type="date"'));
+    b += fld('Anschaffungswert', '<div class="unit-in"><input id="g-wert" value="' + esc(M.has(d.wert) ? d.wert : '') + '" inputmode="decimal" class="r"><i>CHF</i></div>');
+    b += fld('Bereits amortisiert vor Erfassung', '<div class="unit-in"><input id="g-vor" value="' + esc(M.has(d.amortVor) ? d.amortVor : '') + '" inputmode="decimal" class="r" placeholder="0"><i>CHF</i></div>');
+    b += fld('Stand per', inp('g-vordat', d.amortVorDatum || (gid ? '' : M.today()), 'type="date"'));
+    b += '</div>' + sec('Wartung & Zustand') + '<div class="grid2">';
     var defInt = st.intervall ? st.intervall[t] : null;
     b += fld('Letzte Wartung', inp('g-lw', d.letzteWartung, 'type="date"'));
     b += fld('Wartungsintervall Monate', inp('g-int', d.wartungIntervall, 'type="number" min="1" max="120" placeholder="' + (defInt ? 'Standard ' + defInt : 'keine Wartung') + '"'));
@@ -335,9 +417,9 @@
       b += locFields('gl', d._loc || { ort: 'feld' }, { amort: { modus: d._loc ? d._loc.amortModus : 'monat', betrag: d._loc ? d._loc.amortBetrag : '' } });
       b += fld('Seit (Inbetriebnahme)', inp('g-von', d._von || M.today(), 'type="date"'));
     } else {
-      b += '<p class="muted small">Standort und Projekt ändert man mit «Projekt ändern» – so entsteht ein Eintrag in der Historie.</p>';
+      b += '<p class="hint fsec-hint">Standort und Projekt ändert man mit «Projekt ändern» – so entsteht ein Eintrag in der Historie.</p>';
     }
-    b += fld('Bemerkung', '<textarea id="g-bem" rows="3">' + esc(d.bemerkung || '') + '</textarea>', 'full');
+    b += sec('Notizen') + fld('Bemerkung', '<textarea id="g-bem" rows="3">' + esc(d.bemerkung || '') + '</textarea>', 'full');
     b += '<p class="form-err" id="g-err" role="alert"></p>';
 
     var extra = gid ? '<button type="button" class="btn ghost danger-t" data-act="g-del">Löschen</button>' : '';
@@ -608,10 +690,10 @@
     var mag = list.filter(function (x) { return M.info(x.id).isMag; }), feld = list.filter(function (x) { var ii = M.info(x.id); return ii.cur && !ii.isMag; }), ohne = list.filter(function (x) { return !M.info(x.id).cur; });
     var b = '<div class="mv-from">' + M.symbol(gid, 36) + '<div><b>' + esc(g.name) + '</b><span>Bisher: ' + esc(i.ortText) + (i.proj ? ' · Projekt ' + esc(M.projName(i.proj)) : '') + '</span></div></div>' +
       fld('Gerät', '<select id="pg-dev" data-change="pg-dev">' + group('Im Magazin', mag) + group('Im Feld', feld) + group('Ohne Standort', ohne) + '</select>') +
-      '<div class="grid2">' + fld('Projekt (optional)', '<select id="pg-proj" data-change="loc-proj" data-p="pg">' + M.projOptions(i.proj ? i.proj.id : '', true, '– kein Projekt –') + '</select>') +
-      fld('Datum', inp('pg-date', M.today(), 'type="date" data-change="plan-in" data-p="pg"')) + '</div>' +
-      fld('Auftragsnummer / Teilprojekt', '<input id="pg-auftrag" list="auftrag-list" maxlength="40" placeholder="z.B. 26160-03" value="' + esc(i.cur && i.cur.auftrag || '') + '">' + M.auftragList()) +
+      '<div class="grid2">' + M.projSelHtml('pg', i.proj ? i.proj.id : '') +
+      fld('Datum', inp('pg-date', M.today(), 'type="date" data-change="plan-in" data-p="pg"')) + '</div>' + M.newProjBox('pg') +
       '<div id="pg-posbox" class="posbox">' + M.posBoxHtml('pg', i.proj ? i.proj.id : '', i.cur || {}, 1) + '</div>' +
+      fld('Auftragsnummer / Teilprojekt (optional)', '<input id="pg-auftrag" list="auftrag-list" maxlength="40" placeholder="z.B. 26160-03" value="' + esc(i.cur && i.cur.auftrag || '') + '">' + M.auftragList()) +
       M.planBoxHtml('pg', {}) +
       amortFields('pg', { modus: la.modus, betrag: la.betrag }) +
       (g.typ === 'tachymeter' ? mccSelect('pg-mcc', gid, g.mccId) : '') +
@@ -726,27 +808,22 @@
     var proj = I.proj[projektId];
     if (!proj) return;
     var ps = I.posByProj[projektId] || [];
-    var d = P ? M.copy(P) : { projektId: projektId, nr: nextNr(ps), text: '', gruppe: 'erf', auftrag: (ps[ps.length - 1] || {}).auftrag || '', art: 'set', V: '', B: '', W: '', Wp: '', kB: '', kW: '', bemerkung: '' };
+    var d = P ? M.copy(P) : { projektId: projektId, nr: nextNr(ps), text: '', gruppe: 'erf', art: 'set', V: '', B: '', W: '', bemerkung: '' };
     M.ctx = { kind: 'position', pid: pid || null, projektId: projektId };
     // Geräte, die jetzt im Projekt im Feld stehen
     var cand = M.state.data.einsaetze.filter(function (e) { var g = I.ger[e.geraetId]; return e.projektId === projektId && !e.bis && e.ort === 'feld' && g && g.typ !== 'messstelle' && g.typ !== 'mcc'; })
       .map(function (e) { return { e: e, g: I.ger[e.geraetId] }; })
       .sort(function (a, b) { var ia = a.e.positionId === pid ? 0 : 1, ib = b.e.positionId === pid ? 0 : 1; return ia - ib || String(a.g.name).localeCompare(String(b.g.name), 'de', { numeric: true }); });
     var units = P ? M.posUnits(P.id).list.filter(function (u) { return u.aktiv; }) : [];
-    var b = '<div class="grid-pos">' + fld('Pos.', inp('po-nr', d.nr, 'maxlength="12" class="mono"')) + fld('Bezeichnung wie in der Offerte', inp('po-text', d.text, 'maxlength="120" placeholder="z.B. Funk-Messsystem Gateway + 5 Nodes"')) +
-      fld('Auftrag / Teilprojekt', '<input id="po-auftrag" list="auftrag-list" maxlength="40" value="' + esc(d.auftrag || '') + '" placeholder="z.B. 26160-02">' + M.auftragList()) + '</div>' +
+    var b = '<div class="grid-pos">' + fld('Pos.', inp('po-nr', d.nr, 'maxlength="12" class="mono"')) + fld('Bezeichnung wie in der Offerte', inp('po-text', d.text, 'maxlength="120" placeholder="z.B. Funk-Messsystem Gateway + 5 Nodes"')) + '</div>' +
       '<div class="row-wrap"><div class="fld"><span>Gruppe</span><div class="seg" role="group" aria-label="Gruppe">' + M.ABR_ORDER.map(function (g) {
         return '<button type="button" data-act="po-grp" data-k="' + g + '" class="' + (d.gruppe === g ? 'on' : '') + '" aria-pressed="' + (d.gruppe === g) + '">' + esc(M.ABR_GRUPPEN[g].n) + '</button>'; }).join('') + '</div><input type="hidden" id="po-gruppe" value="' + esc(d.gruppe || 'sen') + '"></div>' +
       '<div class="fld"><span>Preisart</span><div class="seg" role="group" aria-label="Preisart"><button type="button" data-act="po-art" data-k="set" class="' + (d.art === 'set' ? 'on' : '') + '" aria-pressed="' + (d.art === 'set') + '">Set-Preis · mehrere Geräte zusammen</button>' +
       '<button type="button" data-act="po-art" data-k="stk" class="' + (d.art !== 'set' ? 'on' : '') + '" aria-pressed="' + (d.art !== 'set') + '">Stückpreis · je Gerät</button></div><input type="hidden" id="po-art" value="' + (d.art === 'set' ? 'set' : 'stk') + '"></div></div>' +
       '<div class="po-preis"><span class="lbl" id="po-preislbl">Preis pro ' + (d.art === 'set' ? 'Set' : 'Gerät') + ' und Monat (Offerte)</span><div class="grid3">' +
       fld('Vorhalten CHF', inp('po-V', d.V, 'inputmode="decimal" class="r"')) + fld('Betrieb CHF', inp('po-B', d.B, 'inputmode="decimal" class="r"')) + fld('Wartung CHF', inp('po-W', d.W, 'inputmode="decimal" class="r"')) + '</div>' +
-      '<p class="muted small" id="po-richt"></p>' +
-      '<div class="grid3">' + fld('Wartung einmalig CHF', inp('po-Wp', d.Wp, 'inputmode="decimal" class="r" placeholder="optional"')) +
-      fld('Unsere Kosten Betrieb / Mt.', inp('po-kB', d.kB, 'inputmode="decimal" class="r" placeholder="optional"')) + fld('Unsere Kosten Wartung / Mt.', inp('po-kW', d.kW, 'inputmode="decimal" class="r" placeholder="optional"')) + '</div>' +
-      '<div class="grid3">' + fld('Offeriert: Monate total', inp('po-offMonate', d.offMonate, 'inputmode="numeric" class="r" placeholder="z.B. 24"')) +
-      '<p class="muted small po-offhint">Einheiten × Monate laut Offerte, z.B. 2 Tachymeter × 12 Monate = 24. MonInv vergleicht damit die verrechneten und die geplanten Monate.</p></div>' +
-      '<p class="muted small">Vorhalten fliesst voll in die Amortisation der Geräte (im Set nach Anschaffungswert verteilt). Betrieb und Wartung laufen pro ' + (d.art === 'set' ? 'Set' : 'Gerät') + '; mit unseren Kosten zeigt MonInv die Marge.</p></div>';
+      '<div class="grid3">' + fld('Offeriert: Monate total', inp('po-offMonate', d.offMonate, 'inputmode="numeric" class="r" placeholder="optional"')) + '</div>' +
+      '<p class="muted small">Vorhalten fliesst voll in die Amortisation der Geräte (im Set nach Anschaffungswert verteilt). Betrieb und Wartung laufen pro ' + (d.art === 'set' ? 'Set' : 'Gerät') + '.</p></div>';
     // Geräte zuweisen
     b += '<fieldset class="extra"><legend>Geräte im Projekt</legend>';
     if (!cand.length) b += '<p class="muted small">Zurzeit steht kein Gerät im Projekt. Geräte lassen sich auch beim Platzieren oder mit «Projekt ändern» einer Position zuordnen.</p>';
@@ -772,19 +849,12 @@
     return m ? m[1] + (+m[2] + 1) : last + '.1';
   }
   /* Richtwert Vorhalten: Anschaffungswert ÷ 36 Monate (Set: Summe, Stück: Durchschnitt) */
-  M.posRicht = function () {
-    var el = $('po-richt'); if (!el) return;
-    var ws = Array.prototype.slice.call(document.querySelectorAll('[data-change=po-dev]:checked')).map(function (x) { return +x.getAttribute('data-wert') || 0; });
-    var set = val('po-art') === 'set', n = ws.length, sum = ws.reduce(function (a, x) { return a + x; }, 0);
-    if (!n || !sum) { el.textContent = 'Richtwert Vorhalten: Anschaffungswert ÷ 36 Monate (erscheint, sobald Geräte angekreuzt sind).'; return; }
-    var r = set ? sum / 36 : sum / n / 36;
-    el.textContent = 'Richtwert Vorhalten ' + (set ? 'pro Set' : 'pro Gerät') + ': CHF ' + M.chf(r) + ' = ' + (set ? 'CHF ' + M.chf(sum) + ' Anschaffung ÷ 36 Monate' : 'Ø CHF ' + M.chf(sum / n) + ' Anschaffung ÷ 36 Monate') + '. Ab dann ist das Gerät abbezahlt.';
-  };
+  M.posRicht = function () { /* Richtwert entfällt */ };
   M.submitPosition = function () {
     var c = M.ctx, I = M.idx();
     var d = c.pid ? M.copy(I.pos[c.pid]) : { id: M.uid('pos'), projektId: c.projektId };
-    d.nr = val('po-nr'); d.text = val('po-text'); d.auftrag = val('po-auftrag'); d.gruppe = val('po-gruppe') || 'sen'; d.art = val('po-art') === 'set' ? 'set' : 'stk';
-    ['V', 'B', 'W', 'Wp', 'kB', 'kW', 'offMonate'].forEach(function (k) { d[k] = M.num(val('po-' + k)); if (d[k] === null) d[k] = ''; });
+    d.nr = val('po-nr'); d.text = val('po-text'); delete d.auftrag; delete d.Wp; delete d.kB; delete d.kW; d.gruppe = val('po-gruppe') || 'sen'; d.art = val('po-art') === 'set' ? 'set' : 'stk';
+    ['V', 'B', 'W', 'offMonate'].forEach(function (k) { d[k] = M.num(val('po-' + k)); if (d[k] === null) d[k] = ''; });
     d.bemerkung = $('po-bem').value.trim();
     if (!d.text) { $('po-err').textContent = 'Bitte die Bezeichnung eingeben.'; return; }
     if (!M.has(d.V) || d.V === '') { $('po-err').textContent = 'Bitte den Preis für Vorhalten eingeben (0 ist möglich).'; return; }

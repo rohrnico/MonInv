@@ -909,3 +909,50 @@ body.viewer-open { overflow: hidden; }
 .pm-o { width: 2px !important; height: 11px !important; top: -2px !important; background: var(--nacht); }
 .pm-n { font-size: 11.5px; color: var(--stein); }
 .pm-n.ok { color: #1D5B3F; } .pm-n.warn { color: #8A4B00; } .pm-n.bad { color: #9B1C0F; font-weight: 700; }
+
+/* ---------- 0.5.3 Formulare: Abschnitte, Datumsfelder, Einheiten, neues Projekt */
+.fld input[type=date], .fld input[type=month], .fld input[type=time] {
+  -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; max-width: 100%;
+  text-align: left; line-height: 40px; font-variant-numeric: tabular-nums;
+}
+.fld input::-webkit-date-and-time-value { text-align: left; margin: 0; }
+.fld input::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
+.fld select { -webkit-appearance: none; appearance: none; padding-right: 34px; cursor: pointer;
+  background: var(--weiss) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2300468E' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.fld select:disabled { background-color: var(--nebel); cursor: default; }
+.fld input, .fld select, .fld textarea { border-radius: 4px; transition: border-color .15s, box-shadow .15s; }
+.fld input:hover:not(:disabled):not(:focus), .fld select:hover:not(:disabled):not(:focus), .fld textarea:hover:not(:focus) { border-color: #9EA9B8; }
+
+h3.fsec { display: flex; align-items: center; gap: 10px; margin: 22px 0 12px; font: 800 13px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--blau); }
+h3.fsec::after { content: ''; flex: 1; height: 1px; background: #D6DDE7; }
+.mbody > h3.fsec:first-child, .seg.full + h3.fsec { margin-top: 4px; }
+.hint.fsec-hint { margin: 16px 0 0; }
+
+.unit-in { position: relative; }
+.unit-in input { padding-right: 46px; }
+.unit-in i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font: 600 12px var(--f-head); font-style: normal; letter-spacing: .05em; color: #8A8F98; pointer-events: none; }
+
+fieldset.extra { border: 1px solid #D6DDE7; background: #F8FAFC; border-radius: 6px; padding: 12px 16px 16px; }
+fieldset.extra legend { background: var(--weiss); border: 1px solid #D6DDE7; border-radius: 12px; padding: 2px 10px; }
+
+.np-box { margin: 12px 0 4px; padding: 12px 14px; background: #EEF4FB; border: 1px solid #B9CDE6; border-left: 4px solid var(--blau); border-radius: 4px; animation: np-in .18s ease-out; }
+.np-h { font: 700 12px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--blau); margin-bottom: 8px; }
+.np-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: 10px 12px; align-items: end; }
+.np-btns { display: flex; gap: 8px; }
+.np-btns .btn { height: 42px; }
+.np-box .form-err:empty { display: none; }
+@keyframes np-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (max-width: 640px) { .np-row { grid-template-columns: minmax(0, 1fr); } .np-btns { justify-content: flex-end; } }
+.np-btns.end { justify-content: flex-end; margin-top: 10px; }
+.npos-g1 { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px 12px; }
+.npos-g2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin-top: 10px; }
+.npos-g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; margin-top: 10px; }
+.npos-box .form-err { margin: 8px 0 0; }
+.pos-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 2px; }
+.pos-chips span { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-radius: 14px; background: #EEF4FB; border: 1px solid #C9D9EC; font: 700 13px var(--f-head); color: var(--nacht); font-variant-numeric: tabular-nums; }
+.pos-chips i { font: 600 11px var(--f-body, inherit); font-style: normal; color: #5A6B80; text-transform: uppercase; letter-spacing: .06em; }
+.pos-chips em { font-style: normal; font-size: 12.5px; color: #7A7F87; }
+.posbox > .fld + .fld { margin-top: 10px; }
+@media (max-width: 640px) { .npos-g3 { grid-template-columns: minmax(0, 1fr); } }
+.mbody .fld + .grid2, form .fld + .grid2, form .grid2 + .fld, form .posbox + .fld { margin-top: 14px; }
+form .posbox:not(:empty) { margin-top: 14px; }

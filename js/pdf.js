@@ -120,8 +120,8 @@
           font('bold', 8.2, NACHT);
           var title = P ? ((P.nr ? P.nr + '  ' : '') + P.text) : 'Ohne Position';
           var tl = doc.splitTextToSize(title, wName - 2 * PAD - 1.5);
-          var sub = P ? [(P.auftrag ? 'Auftrag ' + P.auftrag : ''), (P.art === 'set' ? 'Set-Preis' : 'Stückpreis'), xp.rows.length + (P.art === 'set' ? (xp.rows.length === 1 ? ' Set' : ' Sets') : (xp.rows.length === 1 ? ' Gerät' : ' Geräte'))].filter(Boolean).join(' · ') : 'Einzelansatz je Gerät (zählt als Vorhalten)';
-          var wp = P && M.num(P.Wp) ? M.num(P.Wp) : 0;
+          var sub = P ? [(P.art === 'set' ? 'Set-Preis' : 'Stückpreis'), xp.rows.length + (P.art === 'set' ? (xp.rows.length === 1 ? ' Set' : ' Sets') : (xp.rows.length === 1 ? ' Gerät' : ' Geräte'))].filter(Boolean).join(' · ') : 'Einzelansatz je Gerät (zählt als Vorhalten)';
+          var wp = 0;
           var rh = Math.max(3.6 * tl.length + 4.4, wp ? 8.6 : 0);
           need(rh + 5.5);
           line([213, 212, 211], ML, y, X1, y, 0.35);
@@ -140,7 +140,7 @@
             var label = (u.set ? u.set + ': ' : '') + u.label;
             var ll = doc.splitTextToSize(label, wName - 2 * PAD - 5);
             var mt = M.montageText(u);
-            var dh = 3.4 * ll.length + 1.8 + (mt ? 2.7 : 0) + (u.wp || (u.ohne && u.modus === 'pauschal') ? 2 : 0);
+            var dh = 3.4 * ll.length + 1.8 + (mt ? 2.7 : 0) + (u.ohne && u.modus === 'pauschal' ? 2 : 0);
             need(dh);
             if (idx % 2) fill(NEBEL, ML + 1, y, X1 - ML - 1, dh);
             fill([238, 243, 250], ansX0, y, 3 * wAns, dh);
@@ -151,7 +151,6 @@
             var ou = { flags: u.flags, n: u.n, av: u.av, ab: u.ohne ? null : u.ab, aw: u.ohne ? null : u.aw, v: u.v, b: u.b, w: u.w, t: u.t };
             font('normal', 7.6, NACHT); rowCells(ou, y + 3.3, { st: 'normal', fs: 7.6, col: NACHT });
             if (u.ohne && u.modus === 'pauschal') { font('normal', 5.8, STEIN); txt('pauschal', cols.find(function (c) { return c.k === 'av'; }), y + 3.3 + 2.4); }
-            if (u.wp) { font('normal', 5.8, STEIN); txt('+' + M.chf(u.wp), cols.find(function (c) { return c.k === 'aw'; }), y + 3.3 + 2.4); }
             y += dh;
           });
         });
@@ -193,7 +192,7 @@
         sc.forEach(function (c, i) { doc.text(chf(A.total[c.k]), bx + 34 + (i + 1) * wBet - PAD, by + 4.2, { align: 'right' }); });
         // Hinweis links daneben
         font('normal', 7, STEIN);
-        doc.text(doc.splitTextToSize('Abgerechnet wird pro Kalendermonat: mehr als 10 Tage in Betrieb = ganzer Monat (1), sonst nicht (·). «Monate» = Anzahl abgerechneter Monate des Geräts bzw. Sets. Ansatz in CHF pro Monat, Betrag in CHF = Ansatz × Monate. Ein Set hat einen gemeinsamen Preis und läuft, solange eines seiner Geräte im Projekt steht. Wartung einmalig im Monat, in dem die Einheit startet.', bx - ML - 10), ML, y + 5);
+        doc.text(doc.splitTextToSize('Abgerechnet wird pro Kalendermonat: mehr als 10 Tage in Betrieb = ganzer Monat (1), sonst nicht (·). «Monate» = Anzahl abgerechneter Monate des Geräts bzw. Sets. Ansatz in CHF pro Monat, Betrag in CHF = Ansatz × Monate. Ein Set hat einen gemeinsamen Preis und läuft, solange eines seiner Geräte im Projekt steht.', bx - ML - 10), ML, y + 5);
       }
       // Fusszeilen
       var n = doc.getNumberOfPages();

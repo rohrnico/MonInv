@@ -569,10 +569,10 @@
         akt.forEach(function (u) { nd += u.devs.length; });
         var cur = akt.length * M.posPreis(P); sub += cur;
         rows += '<tr class="pos-row" data-act="pos-edit" data-id="' + P.id + '" style="--gc:' + G.c + '"><td class="mono strong">' + esc(P.nr || '') + '</td>' +
-          '<td><b>' + esc(P.text || '') + '</b><br><span class="muted small">' + (P.auftrag ? 'Auftrag ' + esc(P.auftrag) + ' · ' : '') + (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') + '</span></td>' +
+          '<td><b>' + esc(P.text || '') + '</b><br><span class="muted small">' + (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') + '</span></td>' +
           '<td>' + (akt.length ? '<b>' + akt.length + (P.art === 'set' ? (akt.length === 1 ? ' Set' : ' Sets') + '</b> · ' + nd + ' Geräte' : ' Stück</b>' + (nd > akt.length ? ' · ' + nd + ' Geräte' : '')) : '<span class="muted">keine laufend</span>') +
           (U.length > akt.length ? '<br><span class="muted small">' + (U.length - akt.length) + ' beendet</span>' : '') + '</td>' +
-          '<td class="r mono">' + f2(P.V) + '</td><td class="r mono">' + f2(P.B) + '</td><td class="r mono">' + (+P.W ? f2(P.W) : '') + (+P.Wp ? (+P.W ? '<br>' : '') + '<span class="small">' + M.chf(P.Wp) + ' einm.</span>' : (+P.W ? '' : '–')) + '</td>' +
+          '<td class="r mono">' + f2(P.V) + '</td><td class="r mono">' + f2(P.B) + '</td><td class="r mono">' + (+P.W ? f2(P.W) : '–') + '</td>' +
           '<td class="r mono strong">' + M.chf(cur) + '</td><td>' + pmHtml(M.posMonate(P)) + '</td><td class="r"><span class="ic-btn" aria-hidden="true">✎</span></td></tr>';
       });
       grand += sub;
@@ -605,8 +605,8 @@
       ps.forEach(function (x) {
         var P = x.P, S = x.sum;
         ['n', 'v', 'b', 'w', 't'].forEach(function (k) { gs[k] += S[k]; });
-        var wpTxt = P && M.num(P.Wp) ? '<br><span class="small">+' + M.chf(P.Wp) + ' einm.</span>' : '';
-        h += '<tr class="pg-pos" style="--gc:' + G[g].c + '"><td>' + (P ? '<button type="button" class="link-btn strong" data-act="pos-edit" data-id="' + P.id + '">' + esc((P.nr ? P.nr + ' ' : '') + P.text) + '</button><br><span class="muted small">' + (P.auftrag ? 'Auftrag ' + esc(P.auftrag) + ' · ' : '') + (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') + ' · ' + x.rows.length + (P.art === 'set' ? (x.rows.length === 1 ? ' Set' : ' Sets') : (x.rows.length === 1 ? ' Gerät' : ' Geräte')) + '</span>' :
+        var wpTxt = '';
+        h += '<tr class="pg-pos" style="--gc:' + G[g].c + '"><td>' + (P ? '<button type="button" class="link-btn strong" data-act="pos-edit" data-id="' + P.id + '">' + esc((P.nr ? P.nr + ' ' : '') + P.text) + '</button><br><span class="muted small">' + (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') + ' · ' + x.rows.length + (P.art === 'set' ? (x.rows.length === 1 ? ' Set' : ' Sets') : (x.rows.length === 1 ? ' Gerät' : ' Geräte')) + '</span>' :
           '<b>Ohne Position</b><br><span class="muted small">Einzelansatz je Gerät (zählt als Vorhalten)</span>') + '</td>' +
           S.per.map(function () { return '<td class="mo"></td>'; }).join('') + '<td class="anz"></td>' +
           (P ? '<td class="r mono vbw">' + ans(M.num(P.V)) + '</td><td class="r mono vbw">' + ans(M.num(P.B)) + '</td><td class="r mono vbw">' + ans(M.num(P.W)) + wpTxt + '</td>' : '<td class="vbw"></td><td class="vbw"></td><td class="vbw"></td>') +
@@ -626,7 +626,7 @@
     var tn = posten.reduce(function (a, x) { return a + x.sum.n; }, 0);
     h += '</tbody><tfoot><tr><td>Total Projekt</td>' + A.monate.map(function (mk, i) { return '<td class="r mono mo">' + M.ABR_ORDER.reduce(function (a, g) { return a + A.G[g].per[i].n; }, 0) + '</td>'; }).join('') +
       '<td class="r mono anz">' + tn + '</td><td colspan="3"></td><td class="r mono">' + M.chf(A.total.v) + '</td><td class="r mono">' + M.chf(A.total.b) + '</td><td class="r mono">' + M.chf(A.total.w) + '</td><td class="r mono">' + M.chf(A.total.t) + '</td></tr></tfoot></table></div>';
-    return h + '<p class="muted small">Monate: 1 = abgerechnet (mehr als 10 Tage im Kalendermonat in Betrieb), · = nicht abgerechnet. Ansatz in CHF pro Monat, Betrag in CHF = Ansatz × Monate. Ein Set läuft, solange eines seiner Geräte im Projekt steht. Wartung einmalig im Monat, in dem die Einheit startet.</p></div>';
+    return h + '<p class="muted small">Monate: 1 = abgerechnet (mehr als 10 Tage im Kalendermonat in Betrieb), · = nicht abgerechnet. Ansatz in CHF pro Monat, Betrag in CHF = Ansatz × Monate. Ein Set läuft, solange eines seiner Geräte im Projekt steht.</p></div>';
   }
 
   function einsOf(p) {

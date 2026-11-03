@@ -272,17 +272,17 @@
     function rd(x) { return Math.round((x || 0) * 100) / 100; }
     function mtxt(mk) { return mk.slice(5, 7) + '.' + mk.slice(0, 4); }
     var head = ['Gruppe', 'Pos.', 'Bezeichnung', 'Auftrag', 'Preisart', 'Gerät / Einheit', 'Montiert', 'Abgebaut', 'Geplant bis'].concat(A.monate.map(mtxt))
-      .concat(['Monate', 'Ansatz Vorhalten CHF / Mt.', 'Ansatz Betrieb CHF / Mt.', 'Ansatz Wartung CHF / Mt.', 'Wartung einmalig CHF', 'Vorhalten CHF', 'Betrieb CHF', 'Wartung CHF', 'Total CHF']);
+      .concat(['Monate', 'Ansatz Vorhalten CHF / Mt.', 'Ansatz Betrieb CHF / Mt.', 'Ansatz Wartung CHF / Mt.', 'Vorhalten CHF', 'Betrieb CHF', 'Wartung CHF', 'Total CHF']);
     var rows = [['Abrechnung ' + M.projName(p) + ' · ' + mtxt(A.monate[0] || r.von) + ' bis ' + mtxt(A.monate[A.monate.length - 1] || r.bis) + ' · Monat zählt ab mehr als 10 Tagen in Betrieb'], [], head];
     M.ABR_ORDER.forEach(function (g) {
       var ps = posten.filter(function (x) { return x.g === g; }); if (!ps.length) return;
       var gs = { n: 0, v: 0, b: 0, w: 0, t: 0 };
       ps.forEach(function (x) {
-        var P = x.P, S = x.sum, base = [G[g].n, P ? P.nr || '' : '', P ? P.text : 'ohne Position (Einzelansatz)', P ? P.auftrag || '' : '', P ? (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') : ''];
+        var P = x.P, S = x.sum, base = [G[g].n, P ? P.nr || '' : '', P ? P.text : 'ohne Position (Einzelansatz)', P ? (x.rows[0] && x.rows[0].auftrag) || '' : '', P ? (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') : ''];
         ['n', 'v', 'b', 'w', 't'].forEach(function (k) { gs[k] += S[k]; });
-        rows.push(base.concat(['Total Position', '', '', '']).concat(S.per.map(function () { return ''; })).concat(['', P ? rd(M.num(P.V)) : '', P ? rd(M.num(P.B)) : '', P ? rd(M.num(P.W)) : '', P && M.num(P.Wp) ? rd(M.num(P.Wp)) : '', rd(S.v), rd(S.b), rd(S.w), rd(S.t)]));
+        rows.push(base.concat(['Total Position', '', '', '']).concat(S.per.map(function () { return ''; })).concat(['', P ? rd(M.num(P.V)) : '', P ? rd(M.num(P.B)) : '', P ? rd(M.num(P.W)) : '', rd(S.v), rd(S.b), rd(S.w), rd(S.t)]));
         x.rows.forEach(function (u) {
-          rows.push(base.concat([(u.set ? u.set + ': ' : '') + u.label, u.von ? M.fmtDate(u.von) : '', u.bis ? M.fmtDate(u.bis) : '', u.planBis ? M.fmtDate(u.planBis) : '']).concat(u.flags).concat([u.n, rd(u.av) + (u.ohne && u.modus === 'pauschal' ? ' pauschal' : ''), rd(u.ab), rd(u.aw), u.wp ? rd(u.wp) : '', rd(u.v), rd(u.b), rd(u.w), rd(u.t)]));
+          rows.push(base.concat([(u.set ? u.set + ': ' : '') + u.label, u.von ? M.fmtDate(u.von) : '', u.bis ? M.fmtDate(u.bis) : '', u.planBis ? M.fmtDate(u.planBis) : '']).concat(u.flags).concat([u.n, rd(u.av) + (u.ohne && u.modus === 'pauschal' ? ' pauschal' : ''), rd(u.ab), rd(u.aw), rd(u.v), rd(u.b), rd(u.w), rd(u.t)]));
         });
       });
       rows.push(['Total ' + G[g].n, '', '', '', '', '', '', '', ''].concat(A.G[g].per.map(function (c) { return c.n; })).concat([gs.n, '', '', '', '', rd(gs.v), rd(gs.b), rd(gs.w), rd(gs.t)]));
@@ -554,6 +554,10 @@
     'loc-ort': function (d) { M.locSetOrt(d.p, d.k); },
     'loc-gps': function (d) { M.locGps(d.p); },
     'loc-search': function (d) { M.locSearch(d.p); },
+    'np-add': function (d) { M.newProjAdd(d.p); },
+    'np-cancel': function (d) { M.newProjCancel(d.p); },
+    'npos-add': function (d) { M.newPosAdd(d.p); },
+    'npos-cancel': function (d) { M.newPosCancel(d.p); },
     'loc-pick': function (d) { M.locFill(d.p, +d.lat, +d.lng, d.label); if (M.ctx && M.ctx.kind === 'move') M.movePreview(); },
     'kabel-new': function () { M.startDrawing({}); },
     'kabel-from': function (d) { M.startDrawing({ fromId: d.id }); },
@@ -616,11 +620,14 @@
     'po-dev': function () { M.posRicht(); },
     'plan-in': function (d) { M.planInfoUpdate(d.p); },
     'loc-proj': function (d, el) {
+      if (el.value === M.NEU_PROJ) { M.newProjShow(d.p, true); return; }
+      el.setAttribute('data-prev', el.value); M.newProjShow(d.p, false);
       var p = d.p, bx = $(p + '-posbox'); if (!bx) return;
       bx.innerHTML = M.posBoxHtml(p, el.value, {}, (M.ctx && M.ctx.n) || 1); M.posSync(p);
       if (M.ctx && M.ctx.kind === 'move') M.movePreview();
     },
     'loc-pos': function (d, el) {
+      if (el.value === M.NEU_PROJ) { M.newPosShow(d.p, true); return; }
       var p = d.p, bx = $(p + '-posbox'); if (!bx) return;
       bx.innerHTML = M.posBoxHtml(p, $(p + '-proj').value, { positionId: el.value }, (M.ctx && M.ctx.n) || 1); M.posSync(p);
       var s = $(p + '-pos'); if (s) s.focus();
@@ -720,6 +727,19 @@
       var f = e.target.closest('form[data-form]');
       if (!f) return;
       e.preventDefault();
+      /* offenes «Neues Projekt»-Feld mit Name: zuerst anlegen, dann weiter */
+      var np = f.querySelector('.np-box:not(.npos-box):not([hidden])'), sub = e.submitter, pr;
+      if (np) {
+        var pp = np.id.replace(/-np$/, ''), nm = $(pp + '-np-name');
+        if (nm && nm.value.trim()) { pr = M.newProjAdd(pp); if (pr) pr.then(function () { f.requestSubmit ? f.requestSubmit(sub || undefined) : M.onSubmit(f, sub); }); return; }
+        M.newProjCancel(pp);
+      }
+      var npo = f.querySelector('.npos-box:not([hidden])');
+      if (npo) {
+        var qq = npo.id.replace(/-npos$/, ''), tx = $(qq + '-nptext');
+        if (tx && tx.value.trim()) { pr = M.newPosAdd(qq); if (pr) pr.then(function () { M.onSubmit(f, sub); }); return; }
+        M.newPosCancel(qq);
+      }
       M.onSubmit(f, e.submitter);
     });
     document.addEventListener('keydown', function (e) {

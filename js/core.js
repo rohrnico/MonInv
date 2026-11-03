@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.5.1';
+  M.VERSION = '0.5.2';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -819,7 +819,7 @@
   };
   M.posLabel = function (P) { return P ? 'Pos. ' + (P.nr || '?') + ' · ' + (P.text || '') : ''; };
   M.posPreis = function (P) { return (M.num(P.V) || 0) + (M.num(P.B) || 0) + (M.num(P.W) || 0); };
-  M.auftragOf = function (e) { var P = e && e.positionId && M.idx().pos[e.positionId]; return (P && P.auftrag) || (e && e.auftrag) || ''; };
+  M.auftragOf = function (e) { return (e && e.auftrag) || ''; };
 
   M.abrechnung = function (pid, von, bis) {
     var I = M.idx(), mons = M.monate(von, bis), idx = {};
@@ -846,7 +846,6 @@
           var x = f[mk]; if (!x) return;
           add(row, g, mk, (M.num(P.V) || 0) * x, (M.num(P.B) || 0) * x, (M.num(P.W) || 0) * x, u.devs); any = any || idx[mk] !== undefined;
         });
-        if (M.num(P.Wp)) { var mk0 = u.von.slice(0, 7); if (idx[mk0] !== undefined) { add(row, g, mk0, 0, 0, M.num(P.Wp), []); row.per[idx[mk0]].n--; G[g].per[idx[mk0]].n--; } }
         if (any) row.units.push({ u: u, f: f });
       });
       rows.push(row);
@@ -889,11 +888,10 @@
         var u = uu.u, flags = mons.map(function (mk) { return uu.f[mk] || 0; }), n = flags.reduce(function (a, b) { return a + b; }, 0);
         var devs = u.devs.slice().sort(function (a, b) { return (I.ger[a].typ === 'mcc' ? 1 : 0) - (I.ger[b].typ === 'mcc' ? 1 : 0) || String(I.ger[a].name).localeCompare(String(I.ger[b].name), 'de', { numeric: true }); });
         var names = devs.map(function (id) { return I.ger[id].name; });
-        var r = { devs: devs, von: u.von || null, bis: u.bis || null, planBis: u.bis ? null : M.unitPlanBis(u), label: names.join(' + '), set: P && P.art === 'set' && u.nr ? 'Set ' + u.nr : '', flags: flags, n: n, v: 0, b: 0, w: 0, wp: 0 };
+        var r = { auftrag: (u.eins.find(function (e) { return e.auftrag; }) || {}).auftrag || '', devs: devs, von: u.von || null, bis: u.bis || null, planBis: u.bis ? null : M.unitPlanBis(u), label: names.join(' + '), set: P && P.art === 'set' && u.nr ? 'Set ' + u.nr : '', flags: flags, n: n, v: 0, b: 0, w: 0, wp: 0 };
         if (P) {
           r.av = M.num(P.V) || 0; r.ab = M.num(P.B) || 0; r.aw = M.num(P.W) || 0;
           r.v = r.av * n; r.b = r.ab * n; r.w = r.aw * n;
-          if (M.num(P.Wp) && u.von && inR[u.von.slice(0, 7)]) { r.wp = M.num(P.Wp); r.w += r.wp; }
         } else {
           var e = uu.e, bt = M.num(e.amortBetrag) || 0;
           r.ohne = true; r.modus = e.amortModus === 'monat' ? 'monat' : 'pauschal'; r.av = bt; r.ab = 0; r.aw = 0;

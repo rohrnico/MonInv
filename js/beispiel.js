@@ -175,11 +175,11 @@
 
     // Offertpositionen für AS25 (Beispiel): Tachymeter mit MCC als Einheit, Funk-Set, Stückpreise
     var positionen = [
-      { id: 'pos-as25-11', projektId: 'prj-as25', nr: '1.1', text: 'Automatisches Tachymeter inkl. MCC TSC', gruppe: 'geo', auftrag: '26160-01', art: 'stk', V: 1150, B: 140, W: 120, Wp: '', kB: 60, kW: 58, bemerkung: '' },
-      { id: 'pos-as25-12', projektId: 'prj-as25', nr: '1.2', text: 'Reflektoren', gruppe: 'geo', auftrag: '26160-01', art: 'stk', V: 8, B: 0, W: 0, Wp: '', kB: '', kW: '', bemerkung: '' },
-      { id: 'pos-as25-21', projektId: 'prj-as25', nr: '2.1', text: 'Funk-Messsystem Neigung und Rissweite (Set)', gruppe: 'erf', auftrag: '26160-02', art: 'set', V: 380, B: 45, W: 40, Wp: '', kB: 30, kW: 25, bemerkung: '' },
-      { id: 'pos-as25-31', projektId: 'prj-as25', nr: '3.1', text: 'Inklinometer-Messrohre', gruppe: 'sen', auftrag: '26160-02', art: 'stk', V: 90, B: 0, W: 10, Wp: '', kB: '', kW: '', bemerkung: '' },
-      { id: 'pos-as25-32', projektId: 'prj-as25', nr: '3.2', text: 'Extensometer und Piezometer', gruppe: 'sen', auftrag: '26160-02', art: 'stk', V: 60, B: 0, W: 8, Wp: 300, kB: '', kW: '', bemerkung: '' }
+      { id: 'pos-as25-11', projektId: 'prj-as25', nr: '1.1', text: 'Automatisches Tachymeter inkl. MCC TSC', gruppe: 'geo', art: 'stk', V: 1150, B: 140, W: 120, bemerkung: '' },
+      { id: 'pos-as25-12', projektId: 'prj-as25', nr: '1.2', text: 'Reflektoren', gruppe: 'geo', art: 'stk', V: 8, B: 0, W: 0, bemerkung: '' },
+      { id: 'pos-as25-21', projektId: 'prj-as25', nr: '2.1', text: 'Funk-Messsystem Neigung und Rissweite (Set)', gruppe: 'erf', art: 'set', V: 380, B: 45, W: 40, bemerkung: '' },
+      { id: 'pos-as25-31', projektId: 'prj-as25', nr: '3.1', text: 'Inklinometer-Messrohre', gruppe: 'sen', art: 'stk', V: 90, B: 0, W: 10, bemerkung: '' },
+      { id: 'pos-as25-32', projektId: 'prj-as25', nr: '3.2', text: 'Extensometer und Piezometer', gruppe: 'sen', art: 'stk', V: 60, B: 0, W: 8, bemerkung: '' }
     ];
     var byId = {}; geraete.forEach(function (g) { byId[g.id] = g; });
     einsaetze.forEach(function (e) {
