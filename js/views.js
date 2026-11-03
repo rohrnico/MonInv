@@ -235,6 +235,11 @@
   function act(a, gid, k, label, cls) { return '<button type="button" class="pa-b' + (cls ? ' ' + cls : '') + '" data-act="' + a + '" data-id="' + gid + '">' + ico(k) + '<span>' + label + '</span></button>'; }
   M.ico = ico;
 
+  /* kleines Etikett «bis 03.27» für die geplante Laufzeit (rot = überfällig) */
+  M.planTag = function (e) {
+    var p = M.planInfo(e); if (!p || !p.laufend) return '';
+    return ' <span class="pl-tag' + (p.ueber ? ' over' : p.rest < 31 ? ' soon' : '') + '" title="' + esc(M.planText(e)) + '">bis ' + p.bis.slice(5, 7) + '.' + p.bis.slice(2, 4) + '</span>';
+  };
   /* Aktionen: Kartenpanel = Hauptaktionen + Raster mit Symbolen; Gerätefenster = Werkzeugleiste */
   M.detailActions = function (gid, big) {
     var i = M.info(gid), inInventar = M.state.view === 'inventar' || M.state.view === 'tachymeter';
@@ -329,6 +334,7 @@
       var pr0 = M.posRate(i.cur);
       if (pr0) h += attr('Position', esc(M.posLabel(pr0.P)) + (pr0.u && pr0.u.devs.length > 1 ? '<br><span class="muted small">' + esc(M.unitLabel(pr0.P, pr0.u)) + '</span>' : ''));
       h += attr('Auftrag', M.auftragOf(i.cur) ? '<span class="mono">' + esc(M.auftragOf(i.cur)) + '</span>' : '<span class="muted">–</span>');
+      h += attr('Laufzeit', M.planInfo(i.cur) ? '<span class="' + (M.planInfo(i.cur).ueber ? 'warn-t' : '') + '">' + esc(M.planText(i.cur)) + '</span> <button type="button" class="link-btn small" data-act="laufzeit" data-id="' + i.g.id + '">ändern</button>' : '<span class="muted">nicht geplant</span> <button type="button" class="link-btn small" data-act="laufzeit" data-id="' + i.g.id + '">planen</button>');
     }
     h += attr('Seit', i.cur ? M.fmtDate(i.cur.von) + (i.cur.gesetztVon ? ' · ' + esc(i.cur.gesetztVon) : '') : '–');
     h += attr('Position LV95', i.posSrc === 'eigen' ? M.fmtLv95(i.pos.lat, i.pos.lng) : (i.isMag ? 'im Magazin' : '<span class="warn-t">nicht gesetzt</span>'), i.posSrc === 'eigen' ? 'mono' : '');
@@ -403,6 +409,7 @@
         '<button type="button" class="btn sm inv" data-act="bulk-pos">Position ändern …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-ms">Zu Messstelle …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-auftrag">Auftragsnr. …</button>' +
+        '<button type="button" class="btn sm inv" data-act="bulk-plan">Laufzeit …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-mag">Ins Magazin …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-zst">Zustand ändern …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-labels">Etiketten …</button>' +
@@ -434,7 +441,7 @@
         '<td class="c-name' + (child ? ' ms-indent' : '') + '"><button type="button" class="link-btn strong" data-act="open" data-id="' + g.id + '">' + esc(g.name) + '</button></td>' +
         '<td class="c-kat">' + esc(i.kat ? i.kat.name : M.typLabel[g.typ]) + '</td>' +
         '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.mccTs ? 'bei ' + i.mccTs.name : child ? 'mit der Messstelle' : i.ortText) + '</td>' +
-        '<td class="c-proj' + (child || i.proj || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (child ? '' : i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + '</td>' +
+        '<td class="c-proj' + (child || i.proj || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (child ? '' : i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(g.hersteller || '') + '</td><td class="mono m-hide">' + esc(g.seriennummer || '') + '</td>' +
         '<td class="mono m-hide">' + M.fmtDate(g.kaufdatum) + '</td>' +
         '<td class="r mono m-hide">' + M.chf(g.wert) + '</td>' +
@@ -462,7 +469,7 @@
         '<button type="button" class="link-btn strong" data-act="open" data-id="' + g.id + '">' + esc(g.name) + '</button></span></td>' +
         '<td class="c-kat">Messstelle · ' + mem.length + ' Geräte</td>' +
         '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.ortText) + '</td>' +
-        '<td class="c-proj">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + '</td>' +
+        '<td class="c-proj">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(her.length === 1 ? her[0] : her.length ? 'gemischt' : '') + '</td><td class="muted m-hide">' + mem.length + ' Stk.</td>' +
         '<td class="mono m-hide">' + (kd.length === 1 ? M.fmtDate(kd[0]) : kd.length ? M.fmtDate(kd[0]) + ' –<br>' + M.fmtDate(kd[kd.length - 1]) : '–') + '</td>' +
         '<td class="r mono m-hide">' + M.chf(w) + '</td><td class="r mono calc c-rest" data-l="Restwert">' + M.chf(r) + '</td>' +
@@ -494,7 +501,7 @@
       var pct = w ? Math.min(100, Math.round(w.pct * 100)) : 0;
       h += '<tr><td class="c-sym">' + M.symbol(t.id, 26) + '</td><td class="c-name"><button type="button" class="link-btn strong" data-act="open" data-id="' + t.id + '">' + esc(t.name) + '</button></td>' +
         '<td class="c-kat">' + esc(t.gtyp || '') + '</td><td class="mono c-sn">' + esc(t.seriennummer || '') + '</td><td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.ortText) + '</td>' +
-        '<td class="c-proj' + (i.proj ? '' : ' m-empty') + '">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + '</td>' +
+        '<td class="c-proj' + (i.proj ? '' : ' m-empty') + '">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
         '<td class="c-mcc" data-l="MCC"><label class="sr" for="mcc-' + t.id + '">MCC für ' + esc(t.name) + '</label><select id="mcc-' + t.id + '" class="sel-sm" data-change="mcc" data-id="' + t.id + '">' + mopts + '</select></td>' +
         '<td class="mono m-hide">' + (w ? M.fmtDate(w.letzte) : '–') + '</td>' +
         '<td class="c-w" data-l="Seit Wartung">' + (w ? '<div class="mini-bar' + (w.faellig ? ' due' : '') + '"><span style="width:' + pct + '%"></span></div><span class="mono small">' + w.tage + ' / ' + w.limit + ' T' + (i.isMag ? ' ‖' : '') + '</span>' : '–') + '</td>' +
@@ -534,6 +541,16 @@
     return (M.state.abr = { pid: p.id, von: von, bis: bis });
   };
   /* Positionen eines Projekts */
+  /* Monate einer Position: Balken verrechnet (voll) und geplant (hell) gegenüber der Offerte */
+  function pmHtml(m) {
+    var max = Math.max(m.off, m.geplant, m.verr, 1), over = m.off && m.geplant > m.off, overV = m.off && m.verr > m.off;
+    var bar = '<span class="pm-bar"><i class="pm-g" style="width:' + (m.geplant / max * 100).toFixed(1) + '%"></i><i class="pm-v" style="width:' + (m.verr / max * 100).toFixed(1) + '%"></i>' +
+      (m.off ? '<i class="pm-o" style="left:' + (m.off / max * 100).toFixed(1) + '%"></i>' : '') + '</span>';
+    var t = '<span class="mono">' + m.verr + ' · ' + m.geplant + (m.offen ? '<span class="muted" title="' + m.offen + (m.offen === 1 ? ' laufende Einheit' : ' laufende Einheiten') + ' ohne geplante Laufzeit: gezählt bis heute">+</span>' : '') + ' · ' + (m.off || '–') + '</span>';
+    // Laufzeit und Offertmonate sind freiwillig: Hinweise nur, wenn eine Offertmenge erfasst ist
+    var note = !m.off ? '' : overV ? '<span class="pm-n bad">Offerte überschritten</span>' : over ? '<span class="pm-n warn">Plan über Offerte (+' + (m.geplant - m.off) + ')</span>' : '<span class="pm-n ok">im Rahmen</span>';
+    return '<div class="pm">' + t + bar + note + '</div>';
+  }
   function posHtml(p) {
     var I = M.idx(), ps = I.posByProj[p.id] || [];
     var ohne = M.state.data.einsaetze.filter(function (e) { var g = I.ger[e.geraetId]; return e.projektId === p.id && !e.bis && e.ort === 'feld' && g && g.typ !== 'messstelle' && !(e.positionId && I.pos[e.positionId]); });
@@ -542,7 +559,7 @@
       return h + '<div class="hint">Noch keine Positionen. Die Positionen der Offerte übernehmen: Nummer, Text, Preis pro Monat für <b>Vorhalten</b> (fliesst in die Amortisation), <b>Betrieb</b> (Lizenz, SIM) und <b>Wartung</b>. ' +
         '<b>Set-Preis</b> für mehrere Geräte zu einem Preis (z.B. Gateway + 5 Nodes), <b>Stückpreis</b> für jedes Gerät einzeln. Danach die Geräte zuweisen.' + (ohne.length ? ' Zurzeit stehen ' + ohne.length + ' Geräte ohne Position im Projekt.' : '') + '</div>';
     }
-    h += '<div class="tbl-wrap"><table class="tbl pos-tbl"><thead><tr><th>Pos.</th><th>Bezeichnung</th><th>Einheiten</th><th class="r">Vorhalten</th><th class="r">Betrieb</th><th class="r">Wartung</th><th class="r">Aktuell / Mt.</th><th></th></tr></thead><tbody>';
+    h += '<div class="tbl-wrap"><table class="tbl pos-tbl"><thead><tr><th>Pos.</th><th>Bezeichnung</th><th>Einheiten</th><th class="r">Vorhalten</th><th class="r">Betrieb</th><th class="r">Wartung</th><th class="r">Aktuell / Mt.</th><th class="pm-h">Monate: verrechnet · geplant · Offerte</th><th></th></tr></thead><tbody>';
     var grand = 0;
     M.ABR_ORDER.forEach(function (g) {
       var arr = ps.filter(function (x) { return (x.gruppe || 'sen') === g; }); if (!arr.length) return;
@@ -556,12 +573,12 @@
           '<td>' + (akt.length ? '<b>' + akt.length + (P.art === 'set' ? (akt.length === 1 ? ' Set' : ' Sets') + '</b> · ' + nd + ' Geräte' : ' Stück</b>' + (nd > akt.length ? ' · ' + nd + ' Geräte' : '')) : '<span class="muted">keine laufend</span>') +
           (U.length > akt.length ? '<br><span class="muted small">' + (U.length - akt.length) + ' beendet</span>' : '') + '</td>' +
           '<td class="r mono">' + f2(P.V) + '</td><td class="r mono">' + f2(P.B) + '</td><td class="r mono">' + (+P.W ? f2(P.W) : '') + (+P.Wp ? (+P.W ? '<br>' : '') + '<span class="small">' + M.chf(P.Wp) + ' einm.</span>' : (+P.W ? '' : '–')) + '</td>' +
-          '<td class="r mono strong">' + M.chf(cur) + '</td><td class="r"><span class="ic-btn" aria-hidden="true">✎</span></td></tr>';
+          '<td class="r mono strong">' + M.chf(cur) + '</td><td>' + pmHtml(M.posMonate(P)) + '</td><td class="r"><span class="ic-btn" aria-hidden="true">✎</span></td></tr>';
       });
       grand += sub;
-      h += '<tr class="pos-grp" style="--gc:' + G.c + ';--gl:' + G.l + '"><td colspan="6"><span class="sw"></span>' + esc(G.n) + ' <span class="muted">' + arr.length + (arr.length === 1 ? ' Position' : ' Positionen') + '</span></td><td class="r mono strong">' + M.chf(sub) + '</td><td></td></tr>' + rows;
+      h += '<tr class="pos-grp" style="--gc:' + G.c + ';--gl:' + G.l + '"><td colspan="6"><span class="sw"></span>' + esc(G.n) + ' <span class="muted">' + arr.length + (arr.length === 1 ? ' Position' : ' Positionen') + '</span></td><td class="r mono strong">' + M.chf(sub) + '</td><td></td><td></td></tr>' + rows;
     });
-    h += '</tbody><tfoot><tr><td colspan="6">Total laufend (Einheiten × Preis pro Monat)</td><td class="r mono">CHF ' + M.chf(grand) + '</td><td></td></tr></tfoot></table></div>';
+    h += '</tbody><tfoot><tr><td colspan="6">Total laufend (Einheiten × Preis pro Monat)</td><td class="r mono">CHF ' + M.chf(grand) + '</td><td></td><td></td></tr></tfoot></table></div>';
     if (ohne.length) h += '<p class="hint small">' + ohne.length + (ohne.length === 1 ? ' Gerät steht' : ' Geräte stehen') + ' ohne Position im Projekt (' + esc(ohne.slice(0, 5).map(function (e) { return I.ger[e.geraetId].name; }).join(', ') + (ohne.length > 5 ? ' …' : '')) + '). Ohne Position ' + (ohne.length === 1 ? 'erscheint es' : 'erscheinen sie') + ' nicht in der Abrechnung (' + (ohne.length === 1 ? 'seine' : 'ihre') + ' Amortisation läuft weiter über den Einzelansatz). Zuweisen: Position anklicken › «Geräte».</p>';
     return h;
   }
@@ -578,37 +595,37 @@
     // Positionen mit ihren Geräten: Monate, Ansatz pro Monat und Beträge
     var posten = M.abrPosten(A), mh = A.monate.map(function (mk) { return '<th class="r mo">' + monLabel(mk) + '</th>'; }).join('');
     h += '<div class="tbl-wrap"><table class="tbl abr-tbl abr-pg"><thead>' +
-      '<tr><th>Position / Gerät</th>' + mh + '<th class="r">Monate</th><th class="r vbw">Ansatz Vorh.<br>CHF / Mt.</th><th class="r vbw">Ansatz Betr.<br>CHF / Mt.</th><th class="r vbw">Ansatz Wart.<br>CHF / Mt.</th><th class="r">Vorhalten<br>CHF</th><th class="r">Betrieb<br>CHF</th><th class="r">Wartung<br>CHF</th><th class="r">Total<br>CHF</th></tr></thead><tbody>';
+      '<tr><th>Position / Gerät</th>' + mh + '<th class="r anz">Monate</th><th class="r vbw">Ansatz Vorh.<br>CHF / Mt.</th><th class="r vbw">Ansatz Betr.<br>CHF / Mt.</th><th class="r vbw">Ansatz Wart.<br>CHF / Mt.</th><th class="r">Vorhalten<br>CHF</th><th class="r">Betrieb<br>CHF</th><th class="r">Wartung<br>CHF</th><th class="r">Total<br>CHF</th></tr></thead><tbody>';
     function amt(x) { return x ? M.chf(Math.round(x * 100) / 100) : '<span class="muted">–</span>'; }
     function ans(x) { return x ? M.chf(x) : '<span class="muted">–</span>'; }
     M.ABR_ORDER.forEach(function (g) {
       var ps = posten.filter(function (x) { return x.g === g; }); if (!ps.length) return;
       var gs = { n: 0, v: 0, b: 0, w: 0, t: 0 };
-      h += '<tr class="pg-grp" style="--gc:' + G[g].c + ';--gl:' + G[g].l + '"><td colspan="' + (nm + 9) + '"><span class="sw"></span>' + esc(G[g].n) + '</td></tr>';
+      h += '<tr class="pg-grp" style="--gc:' + G[g].c + ';--gl:' + G[g].l + '"><td colspan="' + (nm + 1) + '"><span class="sw"></span>' + esc(G[g].n) + '</td><td class="anz"></td><td colspan="7"></td></tr>';
       ps.forEach(function (x) {
         var P = x.P, S = x.sum;
         ['n', 'v', 'b', 'w', 't'].forEach(function (k) { gs[k] += S[k]; });
         var wpTxt = P && M.num(P.Wp) ? '<br><span class="small">+' + M.chf(P.Wp) + ' einm.</span>' : '';
         h += '<tr class="pg-pos" style="--gc:' + G[g].c + '"><td>' + (P ? '<button type="button" class="link-btn strong" data-act="pos-edit" data-id="' + P.id + '">' + esc((P.nr ? P.nr + ' ' : '') + P.text) + '</button><br><span class="muted small">' + (P.auftrag ? 'Auftrag ' + esc(P.auftrag) + ' · ' : '') + (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') + ' · ' + x.rows.length + (P.art === 'set' ? (x.rows.length === 1 ? ' Set' : ' Sets') : (x.rows.length === 1 ? ' Gerät' : ' Geräte')) + '</span>' :
           '<b>Ohne Position</b><br><span class="muted small">Einzelansatz je Gerät (zählt als Vorhalten)</span>') + '</td>' +
-          S.per.map(function () { return '<td class="mo"></td>'; }).join('') + '<td></td>' +
+          S.per.map(function () { return '<td class="mo"></td>'; }).join('') + '<td class="anz"></td>' +
           (P ? '<td class="r mono vbw">' + ans(M.num(P.V)) + '</td><td class="r mono vbw">' + ans(M.num(P.B)) + '</td><td class="r mono vbw">' + ans(M.num(P.W)) + wpTxt + '</td>' : '<td class="vbw"></td><td class="vbw"></td><td class="vbw"></td>') +
           '<td class="r mono">' + amt(S.v) + '</td><td class="r mono">' + amt(S.b) + '</td><td class="r mono">' + amt(S.w) + '</td><td class="r mono strong">' + amt(S.t) + '</td></tr>';
         x.rows.forEach(function (r) {
           h += '<tr class="pg-dev"><td><span class="pg-ind">' + (r.set ? '<span class="muted small">' + esc(r.set) + ' · </span>' : '') + r.devs.map(function (id) { return '<button type="button" class="link-btn" data-act="open-any" data-id="' + id + '">' + esc(I.ger[id].name) + '</button>'; }).join(' + ') + (r.von ? ' <span class="pg-dat' + (r.bis ? ' ab' : '') + '">(' + esc(M.montageText(r)) + ')</span>' : '') + '</span></td>' +
             r.flags.map(function (f) { return '<td class="r mono mo">' + (f ? '1' : '<span class="muted">·</span>') + '</td>'; }).join('') +
-            '<td class="r mono">' + r.n + '</td>' +
+            '<td class="r mono anz">' + r.n + '</td>' +
             (r.ohne ? '<td class="r mono vbw">' + ans(r.av) + (r.modus === 'pauschal' ? '<br><span class="small">pauschal</span>' : '') + '</td><td class="r mono vbw muted">–</td><td class="r mono vbw muted">–</td>' :
               '<td class="r mono vbw muted">' + ans(r.av) + '</td><td class="r mono vbw muted">' + ans(r.ab) + '</td><td class="r mono vbw muted">' + ans(r.aw) + (r.wp ? '<br><span class="small">+' + M.chf(r.wp) + '</span>' : '') + '</td>') +
             '<td class="r mono">' + amt(r.v) + '</td><td class="r mono">' + amt(r.b) + '</td><td class="r mono">' + amt(r.w) + '</td><td class="r mono">' + amt(r.t) + '</td></tr>';
         });
       });
       h += '<tr class="abr-sub" style="--gl:' + G[g].l + '"><td>Total ' + esc(G[g].n) + '</td>' + A.G[g].per.map(function (c) { return '<td class="r mono mo">' + (c.n || '<span class="muted">·</span>') + '</td>'; }).join('') +
-        '<td class="r mono">' + gs.n + '</td><td class="vbw" colspan="3"></td><td class="r mono">' + amt(gs.v) + '</td><td class="r mono">' + amt(gs.b) + '</td><td class="r mono">' + amt(gs.w) + '</td><td class="r mono">' + amt(gs.t) + '</td></tr>';
+        '<td class="r mono anz">' + gs.n + '</td><td class="vbw" colspan="3"></td><td class="r mono">' + amt(gs.v) + '</td><td class="r mono">' + amt(gs.b) + '</td><td class="r mono">' + amt(gs.w) + '</td><td class="r mono">' + amt(gs.t) + '</td></tr>';
     });
     var tn = posten.reduce(function (a, x) { return a + x.sum.n; }, 0);
     h += '</tbody><tfoot><tr><td>Total Projekt</td>' + A.monate.map(function (mk, i) { return '<td class="r mono mo">' + M.ABR_ORDER.reduce(function (a, g) { return a + A.G[g].per[i].n; }, 0) + '</td>'; }).join('') +
-      '<td class="r mono">' + tn + '</td><td colspan="3"></td><td class="r mono">' + M.chf(A.total.v) + '</td><td class="r mono">' + M.chf(A.total.b) + '</td><td class="r mono">' + M.chf(A.total.w) + '</td><td class="r mono">' + M.chf(A.total.t) + '</td></tr></tfoot></table></div>';
+      '<td class="r mono anz">' + tn + '</td><td colspan="3"></td><td class="r mono">' + M.chf(A.total.v) + '</td><td class="r mono">' + M.chf(A.total.b) + '</td><td class="r mono">' + M.chf(A.total.w) + '</td><td class="r mono">' + M.chf(A.total.t) + '</td></tr></tfoot></table></div>';
     return h + '<p class="muted small">Monate: 1 = abgerechnet (mehr als 10 Tage im Kalendermonat in Betrieb), · = nicht abgerechnet. Ansatz in CHF pro Monat, Betrag in CHF = Ansatz × Monate. Ein Set läuft, solange eines seiner Geräte im Projekt steht. Wartung einmalig im Monat, in dem die Einheit startet.</p></div>';
   }
 
@@ -683,26 +700,42 @@
       h += '</div>';
     }
     if (eins.length) {
-      var start = eins[0].von, span = Math.max(1, M.days(start, heute));
-      h += '<div class="sec-h"><span>Welches Gerät war wann ' + (mag ? 'hier' : 'im Projekt') + '</span><span class="muted">' + M.fmtDate(start) + ' – heute</span></div><div class="gantt-wrap"><div class="gantt">';
+      var start = eins[0].von, ende = heute;
+      eins.forEach(function (e) { if (!e.bis && e.planBis && e.planBis > ende) ende = e.planBis; });
+      var span = Math.max(1, M.days(start, ende)), xHeute = M.days(start, heute) / span * 100;
+      h += '<div class="sec-h"><span>Welches Gerät war wann ' + (mag ? 'hier' : 'im Projekt') + '</span><span class="muted">' + M.fmtDate(start) + ' – ' + (ende > heute ? 'geplant bis ' + M.fmtDate(ende) : 'heute') + '</span></div><div class="gantt-wrap"><div class="gantt">';
       var ticks = '', d0 = new Date(start + 'T00:00:00'), step = span > 900 ? 12 : span > 300 ? 3 : 1;
       var t = new Date(d0.getFullYear(), d0.getMonth() + 1, 1), guard = 0;
-      while (M.iso(t) < heute && guard++ < 200) {
+      while (M.iso(t) < ende && guard++ < 300) {
         var x = M.days(start, M.iso(t)) / span * 100;
         if (t.getMonth() % step === 0) ticks += '<span class="gt" style="left:' + x.toFixed(2) + '%">' + (t.getMonth() === 0 ? t.getFullYear() : (t.getMonth() + 1) + '.' + String(t.getFullYear()).slice(2)) + '</span>';
         t = new Date(t.getFullYear(), t.getMonth() + 1, 1);
       }
+      if (ende > heute) ticks += '<span class="gt g-now" style="left:' + xHeute.toFixed(2) + '%">heute</span>';
       h += '<div class="g-row g-head"><span class="g-n"></span><div class="g-track">' + ticks + '</div><span class="g-a">' + (mag ? '' : 'CHF') + '</span></div>';
       eins.forEach(function (e) {
         var g = I.ger[e.geraetId]; if (!g) return;
         var i = M.info(g.id), grp = S.GRUPPEN[i.gruppe];
         var l = M.days(start, e.von) / span * 100, w = Math.max(0.6, M.days(e.von, e.bis || heute) / span * 100);
         h += '<div class="g-row"><button type="button" class="g-n link-btn" data-act="open" data-id="' + g.id + '">' + M.symbol(g.id, 18) + esc(g.name) + '</button>' +
-          '<div class="g-track"><span class="g-bar' + (e.bis ? ' done' : '') + '" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;--f:' + grp.fill + ';--i:' + grp.ink + '" title="' + esc(M.ortText(e)) + ' · ' + M.fmtDate(e.von) + ' – ' + (e.bis ? M.fmtDate(e.bis) : 'laufend') + '"></span></div>' +
+          '<div class="g-track">' + (ende > heute ? '<span class="g-today" style="left:' + xHeute.toFixed(2) + '%"></span>' : '') + '<span class="g-bar' + (e.bis ? ' done' : '') + '" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;--f:' + grp.fill + ';--i:' + grp.ink + '" title="' + esc(M.ortText(e)) + ' · ' + M.fmtDate(e.von) + ' – ' + (e.bis ? M.fmtDate(e.bis) : 'laufend') + (e.planBis ? ' · ' + M.planText(e) : '') + '"></span>' + planBar(e) + '</div>' +
           '<span class="g-a mono">' + (M.einsatzAmort(e) ? M.chf(M.einsatzAmort(e)) : (mag || e.ort === 'magazin' ? '' : '–')) + '</span></div>';
       });
       if (!mag) h += '<div class="g-row g-sum"><span class="g-n">Summe</span><div class="g-track"></div><span class="g-a mono">' + M.chf(amort) + '</span></div>';
-      h += '</div></div><p class="muted small">Schraffiert = abgeschlossener Einsatz. Er bleibt in der Historie und in der Abrechnung.</p>';
+      h += '</div></div><p class="muted small">Schraffiert = abgeschlossener Einsatz. Gestrichelt = geplante Laufzeit; rot = länger im Einsatz als geplant.</p>';
+      function planBar(e) {
+        if (!e.planBis || e.ort !== 'feld') return '';
+        var endIst = e.bis || heute;
+        if (e.planBis > endIst && !e.bis) {   // noch geplant: gestrichelt bis Planende
+          var a = M.days(start, heute) / span * 100, b = M.days(start, e.planBis) / span * 100;
+          return '<span class="g-plan" style="left:' + a.toFixed(2) + '%;width:' + Math.max(0.4, b - a).toFixed(2) + '%"></span>';
+        }
+        if (endIst > e.planBis) {   // überzogen: rot ab Planende
+          var c = M.days(start, e.planBis) / span * 100, d = M.days(start, endIst) / span * 100;
+          return '<span class="g-over" style="left:' + c.toFixed(2) + '%;width:' + Math.max(0.4, d - c).toFixed(2) + '%"></span>';
+        }
+        return '<span class="g-pend" style="left:' + (M.days(start, e.planBis) / span * 100).toFixed(2) + '%"></span>';
+      }
     } else {
       h += '<p class="muted">Noch keine Geräte. Geräte ordnet man beim Erfassen oder mit «Projekt ändern» einem Projekt zu.</p>';
     }
@@ -843,6 +876,7 @@
       var pr0 = M.posRate(i.cur);
       if (pr0) h += attr('Position', esc(M.posLabel(pr0.P)) + (pr0.u && pr0.u.devs.length > 1 ? '<br><span class="muted small">' + esc(M.unitLabel(pr0.P, pr0.u)) + '</span>' : ''));
       h += attr('Auftrag', M.auftragOf(i.cur) ? '<span class="mono">' + esc(M.auftragOf(i.cur)) + '</span>' : '<span class="muted">–</span>');
+      h += attr('Laufzeit', M.planInfo(i.cur) ? '<span class="' + (M.planInfo(i.cur).ueber ? 'warn-t' : '') + '">' + esc(M.planText(i.cur)) + '</span> <button type="button" class="link-btn small" data-act="laufzeit" data-id="' + i.g.id + '">ändern</button>' : '<span class="muted">nicht geplant</span> <button type="button" class="link-btn small" data-act="laufzeit" data-id="' + i.g.id + '">planen</button>');
     }
     h += attr('Seit', i.cur ? M.fmtDate(i.cur.von) : '–');
     h += attr('Position LV95', i.posSrc === 'eigen' ? M.fmtLv95(i.pos.lat, i.pos.lng) : (i.isMag ? 'im Magazin' : '<span class="warn-t">nicht gesetzt</span>'), i.posSrc === 'eigen' ? 'mono' : '');
