@@ -272,7 +272,7 @@
           console.warn('MonInv: site in config.js korrigieren auf', real);
           return s;
         }, function () {
-          throw new Error('Euer SharePoint heisst ' + host + ', nicht wie in config.js angegeben. Dort bei «site» eintragen: ' + real + ' – und prüfen, ob die Website «' + path + '» existiert und du Zugriff hast.');
+          throw new Error('Der SharePoint heisst ' + host + ', nicht wie in config.js angegeben. Dort bei «site» eintragen: ' + real + ' – und prüfen, ob die Website «' + path + '» existiert und ob Zugriff besteht.');
         });
       });
     });

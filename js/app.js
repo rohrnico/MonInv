@@ -270,7 +270,7 @@
     M.state.data.kategorien.forEach(function (k) { (k.felder || []).forEach(function (f) { xs[f.name] = true; }); });
     var xk = Object.keys(xs);
     var head = ['Name', 'Gerätetyp', 'Kategorie', 'Gruppe', 'Typ', 'Hersteller', 'Seriennummer', 'Kaufdatum', 'Wert CHF', 'Amortisation aktueller Standort', 'Vor Erfassung amortisiert CHF', 'Stand per', 'Amortisiert total CHF', 'Standorte', 'Restwert CHF', 'Ertrag über Anschaffung CHF',
-      'SIM-Karte', 'Zustand', 'Standort', 'Projekt', 'Reserviert für', 'Auftrag', 'Seit', 'Ost LV95', 'Nord LV95', 'Letzte Wartung', 'Tage seit Wartung', 'Intervall Monate', 'MCC / Tachymeter', 'Messstelle', 'Kabel', 'Bemerkung'].concat(xk);
+      'SIM-Karte', 'Zustand', 'Standort', 'Projekt', 'Reserviert für', 'Teilprojekt', 'Seit', 'Ost LV95', 'Nord LV95', 'Letzte Wartung', 'Tage seit Wartung', 'Intervall Monate', 'MCC / Tachymeter', 'Messstelle', 'Kabel', 'Bemerkung'].concat(xk);
     var rows = [head];
     (list || M.state.data.geraete).forEach(function (g) {
       var i = M.info(g.id), lv = i.posSrc === 'eigen' ? M.toLv95(i.pos.lat, i.pos.lng) : null;
@@ -279,7 +279,7 @@
         M.fmtDate(g.kaufdatum), g.wert, i.cur && !i.isMag ? M.amortText(i.cur) : '', M.num(g.amortVor) || 0, g.amortVorDatum ? M.fmtDate(g.amortVorDatum) : '', i.amortSum, i.nStandorte, i.restwert, i.ertrag, xlText(g.sim), g.zustand === 'ausgemustert' ? 'Ausgemustert' : M.stateLabel[i.state][0],
         i.mccTs ? 'bei ' + i.mccTs.name : i.ortText, i.proj ? M.projName(i.proj) : '', i.res ? M.projName(i.res.proj) + (i.res.ab ? ' ab ' + M.fmtDate(i.res.ab) : '') : '', i.cur && !i.isMag ? M.auftragOf(i.cur) : '',
         i.cur ? M.fmtDate(i.cur.von) : '', lv ? Math.round(lv.e) : '', lv ? Math.round(lv.n) : '',
-        i.wart ? M.fmtDate(i.wart.letzte) : '', i.wart ? i.wart.tage : '', i.wart ? i.wart.intervall : '', link || '', i.ms ? i.ms.name : (i.members ? i.members.length + ' Geräte' : ''), i.kabel.length || '', g.bemerkung || ''
+        i.wart ? M.fmtDate(i.wart.letzte) : '', i.wart ? i.wart.tage : '', i.wart ? i.wart.intervall : '', link || '', i.ms ? i.ms.name : (i.members ? i.members.length + (i.members.length === 1 ? ' Gerät' : ' Geräte') : ''), i.kabel.length || '', g.bemerkung || ''
       ].concat(xk.map(function (k) { return g.extra ? g.extra[k] : ''; })));
     });
     download(fileName || 'MonInv-Geraete-' + stamp() + '.csv', csv(finCols(rows)), 'text/csv;charset=utf-8');
@@ -291,7 +291,7 @@
     function mtxt(mk) { return mk.slice(5, 7) + '.' + mk.slice(0, 4); }
     var head = ['Gruppe', 'Pos.', 'Bezeichnung', 'Auftrag', 'Preisart', 'Gerät / Einheit', 'Montiert', 'Abgebaut', 'Geplant bis'].concat(A.monate.map(mtxt))
       .concat(['Monate', 'Ansatz Vorhalten CHF / Mt.', 'Ansatz Betrieb CHF / Mt.', 'Ansatz Wartung CHF / Mt.', 'Vorhalten CHF', 'Betrieb CHF', 'Wartung CHF', 'Total CHF']);
-    var rows = [['Abrechnung ' + M.projName(p) + ' · ' + mtxt(A.monate[0] || r.von) + ' bis ' + mtxt(A.monate[A.monate.length - 1] || r.bis) + ' · Monat zählt ab mehr als 10 Tagen in Betrieb'], [], head];
+    var rows = [['Abrechnung ' + M.projName(p) + ' · ' + mtxt(A.monate[0] || r.von) + ' bis ' + mtxt(A.monate[A.monate.length - 1] || r.bis) + ' · Abgerechnet wird pro Kalendermonat: mehr als 10 Tage in Betrieb = ganzer Monat'], [], head];
     M.ABR_ORDER.forEach(function (g) {
       var ps = posten.filter(function (x) { return x.g === g; }); if (!ps.length) return;
       var gs = { n: 0, v: 0, b: 0, w: 0, t: 0 };
@@ -311,7 +311,7 @@
   };
   M.exportHistorie = function () {
     var I = M.idx();
-    var rows = [['Gerät', 'Gerätetyp', 'Standort', 'Projekt', 'Auftrag', 'Von', 'Bis', 'Tage', 'Amortisation Art', 'Amortisation Betrag CHF', 'Amortisation total CHF', 'Gesetzt von', 'Geholt von', 'Ost LV95', 'Nord LV95']];
+    var rows = [['Gerät', 'Gerätetyp', 'Standort', 'Projekt', 'Teilprojekt', 'Von', 'Bis', 'Tage', 'Amortisation Art', 'Amortisation Betrag CHF', 'Amortisation total CHF', 'Gesetzt von', 'Geholt von', 'Ost LV95', 'Nord LV95']];
     M.state.data.einsaetze.slice().sort(function (a, b) { return a.von < b.von ? -1 : 1; }).forEach(function (e) {
       var g = I.ger[e.geraetId], p = e.projektId ? I.proj[e.projektId] : null;
       if (!g) return;
@@ -409,7 +409,7 @@
     'file-del': function (d) {
       var f = M.state.data.dateien.find(function (x) { return x.id === d.id; });
       if (!f) return;
-      M.confirm('Datei löschen', '«' + M.esc(f.name) + '» endgültig löschen?', 'Löschen', function () { return M.deleteFile(d.id).then(function () { M.toast('Datei gelöscht'); }); }, true);
+      M.confirm('Datei löschen?', '«' + M.esc(f.name) + '» endgültig löschen?', 'Löschen', function () { return M.deleteFile(d.id).then(function () { M.toast('Datei gelöscht'); }); }, true);
     },
     'dw-files': function (d) { M.openDrawer(d.id, 'dateien'); },
     'viewer-close': function () { M.closeViewer(); },
@@ -433,8 +433,8 @@
       var P = M.idx().pos[d.id]; if (!P) return;
       var n = M.state.data.einsaetze.filter(function (e) { return e.positionId === d.id; }).length;
       M.closeModal();
-      M.confirm('Position ' + (P.nr || '') + ' löschen?', (n ? n + ' Einsätze verweisen darauf. Sie bleiben in der Historie, rechnen danach aber ohne Offertposition (Einzelansatz CHF 0). ' : '') + 'Das lässt sich nicht rückgängig machen.', 'Löschen', function () {
-        return M.deletePosition(d.id).then(function () { M.toast('Position gelöscht'); M.refreshUI(); });
+      M.confirm('Offertposition ' + (P.nr || '') + ' löschen?', (n ? n + ' Einsätze verweisen darauf. Sie bleiben in der Historie, rechnen danach aber ohne Offertposition (Einzelansatz CHF 0). ' : '') + 'Das lässt sich nicht rückgängig machen.', 'Löschen', function () {
+        return M.deletePosition(d.id).then(function () { M.toast('Offertposition gelöscht'); M.refreshUI(); });
       }, true);
     },
     'po-grp': function (d) {
@@ -464,7 +464,7 @@
     },
     'ms-dissolve': function (d) {
       var g = M.idx().ger[d.id], n = (M.idx().members[d.id] || []).length;
-      M.confirm('Messstelle auflösen', 'Messstelle «' + M.esc(g.name) + '» auflösen? Die ' + n + ' Geräte bleiben, wo sie sind, und erscheinen wieder einzeln. Die Historie der Messstelle wird gelöscht, die der Geräte bleibt.', 'Auflösen', function () {
+      M.confirm('Messstelle auflösen?', 'Messstelle «' + M.esc(g.name) + '» auflösen? Die ' + n + ' Geräte bleiben, wo sie sind, und erscheinen wieder einzeln. Die Historie der Messstelle wird gelöscht, die der Geräte bleibt.', 'Auflösen', function () {
         return M.deleteGeraetData(d.id).then(function () { M.toast('Messstelle aufgelöst'); });
       }, true);
     },
@@ -487,12 +487,12 @@
     },
     'bulk-pos': function () { M.openBulkPos(selectedIds()); },
     'gps': function () {
-      if (!navigator.geolocation) { M.toast('Dieses Gerät liefert keinen Standort.', 'err'); return; }
-      M.toast('Standort wird ermittelt …');
+      if (!navigator.geolocation) { M.toast('Dieser Browser liefert keine GPS-Position.', 'err'); return; }
+      M.toast('GPS-Position wird ermittelt …');
       navigator.geolocation.getCurrentPosition(function (p) {
         M.toast('GPS-Genauigkeit ± ' + Math.round(p.coords.accuracy) + ' m');
         M.placeAt(p.coords.latitude, p.coords.longitude);
-      }, function () { M.toast('Standort nicht verfügbar. Bitte in die Karte tippen oder LV95 eingeben.', 'err'); }, { enableHighAccuracy: true, timeout: 15000 });
+      }, function () { M.toast('GPS-Position nicht verfügbar. Bitte in die Karte tippen oder LV95 eingeben.', 'err'); }, { enableHighAccuracy: true, timeout: 15000 });
     },
     'map-goto': function (d) { M.mapFocusPoint(+d.lat, +d.lng, 18); var r = $('pl-res'); if (r) r.innerHTML = ''; },
     'show-map': function (d) { M.state.drawer = null; M.go('karte'); M.select(d.id); setTimeout(function () { M.mapFocus(d.id); }, 120); },
@@ -514,7 +514,7 @@
     'bulk-zst': function () { M.openZustand(selectedIds()); },
     'bulk-del': function () {
       var ids = selectedIds();
-      M.confirm(ids.length + ' Geräte löschen?', 'Die Geräte und ihre ganze Historie werden gelöscht. Verbundene Kabel bleiben, verlieren aber die Verbindung. Für Geräte, die nur nicht mehr gebraucht werden, besser «Zustand ändern › ausgemustert».', 'Endgültig löschen', function () {
+      M.confirm(ids.length + (ids.length === 1 ? ' Gerät' : ' Geräte') + ' löschen?', 'Die Geräte und ihre ganze Historie werden gelöscht. Verbundene Kabel bleiben, verlieren aber die Verbindung. Für Geräte, die nur nicht mehr gebraucht werden, besser «Zustand ändern › ausgemustert».', 'Endgültig löschen', function () {
         return Promise.all(ids.map(function (id) { return M.deleteGeraetData(id); })).then(function () { M.state.invSel = {}; M.toast(ids.length + ' Geräte gelöscht'); });
       }, true);
     },
@@ -591,7 +591,7 @@
     'amort-mode': function (d) { M.amortSetMode(d.p, d.k); },
     'mcc-free': function (d) {
       var ii = M.info(d.id);
-      if (ii.cur && !ii.isMag) { M.toast('Der Tachymeter steht im Feld und braucht eine MCC. Zuerst eine andere MCC wählen oder ins Magazin verschieben.'); return; }
+      if (ii.cur && !ii.isMag) { M.toast('Der Tachymeter steht im Feld und braucht eine MCC. Zuerst eine andere MCC wählen oder mit «Ins Magazin» zurückbuchen.'); return; }
       M.setMcc(d.id, null).then(function () { M.toast('MCC gelöst'); M.refreshUI(); }); },
     'pw-toggle': function (d, el) { var i = $(d['for']); if (!i) return; var show = i.type === 'password'; i.type = show ? 'text' : 'password'; el.textContent = show ? 'Verbergen' : 'Zeigen'; },
     'pw-show': function (d, el) {
@@ -657,7 +657,7 @@
         if (drin) { M.toast('Im Magazin liegen noch ' + drin + ' Geräte. Bitte zuerst verschieben.', 'err'); return; }
       }
       var refs = M.state.data.einsaetze.filter(function (e) { return e.projektId === pid || e.magazinId === pid; });
-      M.confirm(M.projName(p) + ' löschen?', refs.length ? refs.length + ' Einsätze verweisen darauf. Sie bleiben in der Historie der Geräte, aber ohne ' + (p.typ === 'magazin' ? 'Magazin' : 'Projekt') + '. Eine Alternative ist der Status «abgeschlossen».' : 'Es gibt keine Einsätze dazu.', 'Löschen', function () {
+      M.confirm(M.projName(p) + ' löschen?', refs.length ? refs.length + (refs.length === 1 ? ' Einsatz verweist' : ' Einsätze verweisen') + ' darauf. Sie bleiben in der Historie der Geräte, aber ohne ' + (p.typ === 'magazin' ? 'Magazin' : 'Projekt') + '. Eine Alternative ist der Status «abgeschlossen».' : 'Es gibt keine Einsätze dazu.', 'Löschen', function () {
         var jobs = refs.map(function (e) { var c = M.copy(e); if (c.projektId === pid) { c.projektId = null; } if (c.magazinId === pid) { c.magazinId = null; } return M.put('einsaetze', c); });
         M.state.data.kabel.forEach(function (k) { if (k.projektId === pid) { var c = M.copy(k); c.projektId = null; jobs.push(M.put('kabel', c)); } });
         (M.idx().dat[pid] || []).forEach(function (f) { jobs.push(M.deleteFile(f.id)); });
@@ -665,7 +665,7 @@
         jobs.push(M.del('projekte', pid));
         M.state.projSel = null;
         if (M.state.filters.map.projekt === pid) M.state.filters.map.projekt = '';
-        return Promise.all(jobs).then(function () { M.toast('Gelöscht'); });
+        return Promise.all(jobs).then(function () { M.toast('Projekt gelöscht'); });
       }, true);
     }
   };
@@ -765,7 +765,7 @@
   var RO_ACT = set('go sel open desel inv-open reload-app file-open dw-files viewer-close viewer-tab open-any abr-q abr-export abr-view abr-pdf ' +
     'show-map map-goto toggle-grp toggle-kabel layer fit side-open side-close logout drawer-close details dw-tab modal-close modal-bg search-pick ' +
     'export-csv export-hist export-kabel refresh proj-sel proj-back inv-filt projf proj-map pw-show pw-copy kabel-sel kabel-focus ' +
-    'scan scan-multi scan-mode scan-manual scan-rm sa-show bulk-clear role-test');
+    'scan scan-multi scan-mode scan-manual scan-rm sa-show bulk-clear role-test ausl ausl-back ausl-range ausl-tog sp-folder');
   var RO_CHANGE = set('mapf invf inv-sel inv-all abr projf msa-q');
   var RO_FORM = set('scan ortsuche');
   var FIN_ACT = set('abr-q abr-export abr-view abr-pdf pos-new pos-edit pos-del po-grp po-art amort-scope amort-mode');

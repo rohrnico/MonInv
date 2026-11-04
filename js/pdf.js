@@ -26,7 +26,7 @@
       var wName = showM ? (nm > 12 ? 58 : 72) : 110;
       var wMon = showM && nm ? (X1 - ML - fixed - wName) / nm : 0;
       if (!showM) wName = X1 - ML - fixed;
-      var cols = [{ k: 'name', w: wName, al: 'left', t: 'Position / Gerät' }];
+      var cols = [{ k: 'name', w: wName, al: 'left', t: 'Offertposition / Gerät' }];
       if (showM) mons.forEach(function (mk) { cols.push({ k: 'm', mk: mk, w: wMon, al: 'right', t: mlabel(mk) }); });
       cols.push({ k: 'n', w: wAnz, al: 'right', t: 'Monate' });
       cols.push({ k: 'av', w: wAns, al: 'right', t: 'Vorh.', g: 'ans' }, { k: 'ab', w: wAns, al: 'right', t: 'Betr.', g: 'ans' }, { k: 'aw', w: wAns, al: 'right', t: 'Wart.', g: 'ans' });
@@ -83,7 +83,7 @@
             font('head', 7, [255, 255, 255]);
             return;
           }
-          txt(c.k === 'name' ? 'POSITION / GERÄT' : c.t.toUpperCase(), c, y + 8);
+          txt(c.k === 'name' ? 'OFFERTPOSITION / GERÄT' : c.t.toUpperCase(), c, y + 8);
         });
         y += hh;
       }
@@ -104,7 +104,7 @@
       }
 
       kopf(true);
-      if (!posten.length) { font('normal', 11, STEIN); doc.text('In diesem Zeitraum lief kein verrechnetes Gerät in diesem Projekt.', ML, y + 10); }
+      if (!posten.length) { font('normal', 11, STEIN); doc.text('In diesem Zeitraum lief kein abgerechnetes Gerät in diesem Projekt.', ML, y + 10); }
       M.ABR_ORDER.forEach(function (g) {
         var ps = posten.filter(function (x) { return x.g === g; }); if (!ps.length) return;
         var gc = hex(G[g].c), gl = hex(G[g].l), gt = hex(G[g].t);
@@ -118,7 +118,7 @@
           ['n', 'v', 'b', 'w', 't'].forEach(function (k) { gs[k] += S[k]; });
           // Positionszeile
           font('bold', 8.2, NACHT);
-          var title = P ? ((P.nr ? P.nr + '  ' : '') + P.text) : 'Ohne Position';
+          var title = P ? ((P.nr ? P.nr + '  ' : '') + P.text) : 'Ohne Offertposition';
           var tl = doc.splitTextToSize(title, wName - 2 * PAD - 1.5);
           var sub = P ? [(P.art === 'set' ? 'Set-Preis' : 'Stückpreis'), xp.rows.length + (P.art === 'set' ? (xp.rows.length === 1 ? ' Set' : ' Sets') : (xp.rows.length === 1 ? ' Gerät' : ' Geräte'))].filter(Boolean).join(' · ') : 'Einzelansatz je Gerät (zählt als Vorhalten)';
           var wp = 0;
@@ -203,7 +203,7 @@
         doc.text('RISTAG Ingenieure AG · MonInv ' + M.VERSION + ' · ' + M.projName(p), ML, H - 5.5);
         doc.text('Seite ' + i + ' von ' + n, X1, H - 5.5, { align: 'right' });
       }
-      doc.setProperties({ title: 'Abrechnung ' + M.projName(p) + ' ' + r.von + ' bis ' + r.bis, creator: 'MonInv ' + M.VERSION, author: 'RISTAG Ingenieure AG' });
+      doc.setProperties({ title: 'Abrechnung ' + M.projName(p) + ' ' + M.monLabel(r.von, true) + ' bis ' + M.monLabel(r.bis, true), creator: 'MonInv ' + M.VERSION, author: 'RISTAG Ingenieure AG' });
       return doc.output('blob');
     });
   };

@@ -117,7 +117,7 @@
   function saGps() {
     var c = M.ctx; if (!c || c.kind !== 'scanakt') return;
     var base = c.base, bi = M.info(base), btn = $('sa-gps'), m = $('sa-msg');
-    if (!navigator.geolocation) { m.textContent = 'Dieses Gerät liefert keinen Standort.'; m.className = 'sa-msg err'; return; }
+    if (!navigator.geolocation) { m.textContent = 'Dieser Browser liefert keine GPS-Position.'; m.className = 'sa-msg err'; return; }
     btn.disabled = true; btn.classList.add('busy'); m.className = 'sa-msg'; m.textContent = 'Standort wird ermittelt …';
     navigator.geolocation.getCurrentPosition(function (pos) {
       if (!M.ctx || M.ctx.kind !== 'scanakt') return;
@@ -141,7 +141,7 @@
     }, function (e) {
       btn.disabled = false; btn.classList.remove('busy');
       m.className = 'sa-msg err';
-      m.textContent = e && e.code === 1 ? 'Kein Zugriff auf den Standort. In den Einstellungen für den Browser erlauben.' : 'Standort nicht verfügbar. Draussen nochmals versuchen.';
+      m.textContent = e && e.code === 1 ? 'Kein Zugriff auf die GPS-Position. In den Einstellungen für den Browser erlauben.' : 'GPS-Position nicht verfügbar. Draussen nochmals versuchen.';
     }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 });
   }
 
@@ -252,7 +252,7 @@
       '<label class="chk"><input type="checkbox" id="et-rahmen"> Umrisse mitdrucken (Probedruck auf Normalpapier)</label>' +
       '<div class="et-info" id="et-info"></div>' +
       (M.qrBasisLokal() ? '<p class="hint warn">Die App läuft hier lokal. Der QR-Code würde auf <code>' + esc(M.qrBasis()) + '</code> zeigen und funktioniert auf dem Handy nicht. Etiketten nach dem Aufschalten drucken oder in <code>config.js</code> die <code>qrAdresse</code> eintragen.</p>' : '') +
-      '<p class="muted small">Im Druckdialog <b>Tatsächliche Grösse / 100 %</b> wählen und als Papierart <b>Etiketten</b> einstellen. Sitzt der Druck nicht genau: Einstellungen › Etiketten › Versatz.</p>' +
+      '<p class="muted small">Im Druckdialog <b>Tatsächliche Grösse / 100 %</b> wählen und als Papierart <b>Etiketten</b> einstellen. Sitzt der Druck nicht genau: Einstellungen › QR-Etiketten › Versatz.</p>' +
       '</div><div class="et-sheet-w"><span class="lbl">Erstes freies Feld auf dem Bogen antippen</span><div class="et-sheet" id="et-sheet"></div></div></div>';
     M.modal({ title: 'Etiketten drucken', form: 'etiketten', wide: true, body: b, noFocus: true,
       foot: '<button type="button" class="btn ghost" data-act="et-test">Testseite</button><span class="grow"></span><button type="button" class="btn ghost" data-act="modal-close">Abbrechen</button><button type="submit" class="btn">PDF erstellen</button>' });
@@ -302,7 +302,7 @@
       return M.etikettenPdf(list.map(function (g) { return I.ger[g.id]; }), { format: c.format, start: c.start, kopien: kopien, rahmen: rahmen });
     }).then(function (r) {
       etShow(r, 'MonInv-Etiketten-' + c.format + '-' + M.today() + '.pdf', tab);
-      M.toast(r.anzahl + ' Etiketten auf ' + r.seiten + (r.seiten === 1 ? ' Bogen' : ' Bogen'));
+      M.toast(r.anzahl + (r.anzahl === 1 ? ' Etikett' : ' Etiketten') + ' auf ' + r.seiten + (r.seiten === 1 ? ' Bogen' : ' Bogen'));
     }).catch(function (e) { console.error(e); if (tab && !tab.closed) tab.close(); M.toast('PDF konnte nicht erstellt werden: ' + (e.message || e), 'err'); if (btn) { btn.disabled = false; btn.textContent = 'PDF erstellen'; } });
   };
 
@@ -417,7 +417,7 @@
     el.innerHTML = '<div class="sc-chips">' + scan.list.map(function (id) {
       var g = I.ger[id], i = M.info(id);
       return '<span class="sc-chip"><b>' + esc(g.name) + '</b><span>' + esc(i.ortText || '') + '</span><button type="button" class="ic-btn" data-act="scan-rm" data-id="' + id + '" aria-label="' + esc(g.name) + ' entfernen">×</button></span>';
-    }).join('') + '</div><div class="btn-row"><button type="button" class="btn sm" data-act="scan-go" data-k="mag">Ins Magazin …</button><button type="button" class="btn sm" data-act="scan-go" data-k="move">Projekt ändern …</button><button type="button" class="btn sm ghost" data-act="scan-go" data-k="inv">Im Inventar auswählen</button><button type="button" class="btn sm ghost" data-act="scan-go" data-k="label">Etiketten …</button></div>';
+    }).join('') + '</div><div class="btn-row"><button type="button" class="btn sm" data-act="scan-go" data-k="mag">Ins Magazin …</button><button type="button" class="btn sm" data-act="scan-go" data-k="move">Projekt ändern …</button><button type="button" class="btn sm ghost" data-act="scan-go" data-k="inv">Im Inventar auswählen</button><button type="button" class="btn sm ghost" data-act="scan-go" data-k="label">Etiketten drucken …</button></div>';
   }
 
   /* ---------- Aktionen anmelden */

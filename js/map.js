@@ -106,7 +106,7 @@
   };
 
   function markerIcon(i, sel) {
-    var html = M.symbol(i.g.id, 30, { map: true }) + '<span class="mk-lab">' + M.esc(i.g.name) + (i.g.mccId ? ' + MCC ' + M.esc(M.mccKurz(i.g.mccId)) : '') + (i.members ? ' · ' + i.members.length + ' Geräte' : '') + '</span>';
+    var html = M.symbol(i.g.id, 30, { map: true }) + '<span class="mk-lab">' + M.esc(i.g.name) + (i.g.mccId ? ' + MCC ' + M.esc(M.mccKurz(i.g.mccId)) : '') + (i.members ? ' · ' + i.members.length + (i.members.length === 1 ? ' Gerät' : ' Geräte') : '') + '</span>';
     return L.divIcon({ html: html, className: 'mk' + (sel ? ' mk-sel' : ''), iconSize: [36, 36], iconAnchor: [18, 18] });
   }
 

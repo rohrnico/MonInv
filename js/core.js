@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.6.13';
+  M.VERSION = '0.7.0';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -157,6 +157,7 @@
   M.projName = function (p) { return p ? (p.typ === 'magazin' ? p.name : (p.nummer ? p.nummer + ' ' : '') + p.name) : '–'; };
   /* Amortisation eines Einsatzes: pauschal einmalig, oder pro Monat solange das Gerät dort steht */
   /* ---------- Geplante Laufzeit eines Einsatzes */
+  M.addDays = function (iso, n) { var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return M.iso(d); };
   M.addMonths = function (iso, n) {
     var d = new Date(iso + 'T00:00:00'), day = d.getDate();
     var t = new Date(d.getFullYear(), d.getMonth() + (+n || 0), 1);
@@ -370,7 +371,7 @@
       }
       if (wert && beRow < 0 && before < wert && cum >= wert) beRow = rows.length;
       rows.push({ kind: e.ort === 'magazin' ? 'mag' : (pr ? 'monat' : e.amortModus), e: e, von: e.von, bis: e.bis, ort: M.ortText(e), proj: e.projektId ? M.idx().proj[e.projektId] : null,
-        ansatz: e.ort === 'magazin' ? 'Magazin · nichts' : pr ? M.posLabel(pr.P) + ' · CHF ' + M.chf(Math.round(b * 100) / 100) + ' pro Monat' + (pr.u && pr.u.devs.length > 1 ? ' (' + Math.round(pr.anteil * 100) + ' % des Sets)' : '') : (e.amortModus === 'monat' ? 'CHF ' + M.chf(b) + ' pro Monat' : 'CHF ' + M.chf(b) + ' pauschal' + (imStart ? ' – vor dem ' + M.fmtDate(vorDatum) + ' gesetzt, im Startwert enthalten' : '')), tage: tage, betrag: e.ort === 'magazin' ? null : amt, kum: cum });
+        ansatz: e.ort === 'magazin' ? 'Magazin · keine Amortisation' : pr ? M.posLabel(pr.P) + ' · CHF ' + M.chf(Math.round(b * 100) / 100) + ' pro Monat' + (pr.u && pr.u.devs.length > 1 ? ' (' + Math.round(pr.anteil * 100) + ' % des Sets)' : '') : (e.amortModus === 'monat' ? 'CHF ' + M.chf(b) + ' pro Monat' : 'CHF ' + M.chf(b) + ' pauschal' + (imStart ? ' – vor dem ' + M.fmtDate(vorDatum) + ' gesetzt, im Startwert enthalten' : '')), tage: tage, betrag: e.ort === 'magazin' ? null : amt, kum: cum });
     });
     if (wert && vor >= wert && !be) { be = t(vorDatum); beRow = 0; }
     var cpr = i.cur && M.posRate(i.cur);
@@ -400,7 +401,7 @@
     var s = i.g.zustand === 'ausgemustert' ? ['Ausgemustert', 'chip-off'] : M.stateLabel[i.state];
     return '<span class="chip ' + s[1] + '">' + s[0] + '</span>';
   };
-  M.typLabel = { sensor: 'Geotechnischer Sensor', tachymeter: 'Tachymeter', mcc: 'MCC TSC', messstelle: 'Messstelle' };
+  M.typLabel = { sensor: 'Sensor', tachymeter: 'Tachymeter', mcc: 'MCC TSC', messstelle: 'Messstelle' };
   M.isGeraet = function (g) { return g && g.typ !== 'messstelle'; };
   M.kabelTypen = {
     strom:  { name: 'Stromkabel',  color: '#F4A261', dash: null },
@@ -716,7 +717,7 @@
     }
     var moved = {}; out.forEach(function (x) { moved[x.id] = x; });
     var hit = es.map(function (y) { return moved[y.id] || y; }).find(function (y) { return y.von < (c.bis || '9999') && (y.bis || '9999') > c.von; });
-    if (hit) return { err: 'überschneidet ' + M.fmtDate(hit.von) + '–' + (hit.bis ? M.fmtDate(hit.bis) : 'laufend') };
+    if (hit) return { err: 'überschneidet ' + M.fmtDate(hit.von) + ' – ' + (hit.bis ? M.fmtDate(hit.bis) : 'laufend') };
     if (!c.bis && es.some(function (y) { return !(moved[y.id] || y).bis; })) return { err: 'hat schon einen laufenden Einsatz' };
     return { puts: out };
   };

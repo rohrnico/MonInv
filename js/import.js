@@ -275,7 +275,7 @@
       var rank = function (it) { return it.errs.length ? 0 : !it.existing ? 1 : it.changed.length || it.moveDiff ? 2 : 3; };
       A.items.slice().sort(function (a, c) { return rank(a) - rank(c) || a.zeile - c.zeile; }).forEach(function (it) {
         var st = it.errs.length ? ['Fehler', 'chip-off'] : !it.existing ? ['neu', 'chip-ok'] : it.changed.length ? ['aktualisieren', 'chip-mag'] : ['unverändert', 'chip-mag'];
-        var ort = it.target ? (it.target.ort === 'magazin' ? M.idx().proj[it.target.magazinId].name : (it.target.ortName || (M.has(it.target.lat) ? 'LV95 ' + M.fmtLv95(it.target.lat, it.target.lng) : 'Feld · ohne Position'))) : (it.link && it.typ === 'mcc' ? 'bei ' + it.link : '–');
+        var ort = it.target ? (it.target.ort === 'magazin' ? M.idx().proj[it.target.magazinId].name : (it.target.ortName || (M.has(it.target.lat) ? 'LV95 ' + M.fmtLv95(it.target.lat, it.target.lng) : 'Feld · Position fehlt'))) : (it.link && it.typ === 'mcc' ? 'bei ' + it.link : '–');
         var hint = it.errs.concat(it.existing && it.changed.length ? ['geändert: ' + it.changed.join(', ')] : []).concat(it.notes).concat(it.moveDiff ? ['Standort/Projekt weicht ab'] : []);
         b += '<tr><td class="mono">' + it.zeile + '</td><td><span class="chip ' + st[1] + '">' + st[0] + '</span></td><td class="strong">' + esc(it.name || '–') + '</td><td>' + esc(it.typ ? M.typLabel[it.typ] : '') + '</td><td>' + esc(ort) + '</td><td class="small' + (it.errs.length ? ' warn-t' : '') + '">' + esc(hint.join(' · ')) + '</td></tr>';
       });
@@ -348,7 +348,7 @@
     });
     seq(jobs).then(function () {
       M.refreshUI();
-      M.toast('Import fertig: ' + nNeu + ' neu, ' + nUpd + ' aktualisiert' + (nMove ? ', ' + nMove + ' Standorte' : '') + (nLink ? ', ' + nLink + ' MCC zugeordnet' : ''));
+      M.toast('Import abgeschlossen: ' + nNeu + ' neu, ' + nUpd + ' aktualisiert' + (nMove ? ', ' + nMove + ' Standorte' : '') + (nLink ? ', ' + nLink + ' MCC zugeordnet' : ''));
     }).catch(function (e) { M.failed(e); M.refreshUI(); });
   };
 

@@ -1084,7 +1084,8 @@ form .posbox:not(:empty) { margin-top: 14px; }
 
 /* Ansicht erscheint */
 .view.enter > .page, .view.enter .map-wrap { animation: viewIn .32s cubic-bezier(.2,.8,.2,1) both; }
-.view.enter .side, .view.enter .panel { animation: viewIn .36s .05s cubic-bezier(.2,.8,.2,1) both; }
+/* Filterspalte nur auf dem PC einblenden – auf Handy/Tablet ist sie per transform ausgeblendet und würde sonst kurz erscheinen */
+@media (min-width: 1081px) { .view.enter .side, .view.enter .panel { animation: viewIn .36s .05s cubic-bezier(.2,.8,.2,1) both; } }
 /* Listen bauen sich gestaffelt auf (die ersten 14 Zeilen) */
 .view.enter .tbl tbody tr, .view.enter .pl-item, .view.enter .kat-item, .view.enter .card { animation: rowIn .34s cubic-bezier(.2,.8,.2,1) both; }
 .view.enter .tbl tbody tr:nth-child(2), .view.enter .pl-item:nth-child(2), .view.enter .card:nth-child(3) { animation-delay: .025s; }
@@ -1139,3 +1140,64 @@ form .posbox:not(:empty) { margin-top: 14px; }
 .ft-miss { position: relative; overflow: hidden; display: block; margin: 0 10px 8px; padding: 6px 8px; background: var(--signal-bg); color: var(--signal-t); font: 600 12px var(--f-body); cursor: pointer; border-radius: 2px; }
 .ft-miss input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .vw-none .file-in { margin-top: 10px; }
+
+/* ---------- Auslastung (Dashboard im Inventar) */
+.au-page .page-h h1 { margin-right: 4px; }
+.au-back { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 8px 0 2px; border: 0; background: none; color: var(--blau); font: 700 15px var(--f-head); cursor: pointer; }
+.au-back span { font-size: 24px; line-height: 1; margin-top: -3px; }
+.au-range { flex-wrap: wrap; }
+.au-kpi { margin-top: 4px; }
+.au-trend { background: var(--weiss); border: 1px solid var(--linie); padding: 12px 14px 6px; margin: 4px 0 14px; }
+.au-th { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.au-th b { font: 700 15px var(--f-head); }
+.au-cols { display: flex; align-items: stretch; gap: 6px; height: 150px; padding-bottom: 30px; border-bottom: 1px solid #C9C8C7; margin-bottom: 30px; }
+.au-col { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; }
+.au-c { width: 100%; max-width: 44px; background: linear-gradient(to top, var(--blau), #3D78B8); border-radius: 3px 3px 0 0; transform-origin: bottom; animation: grow .55s cubic-bezier(.2,.8,.2,1) both; animation-delay: var(--d); }
+.au-v { font: 600 11px var(--f-mono); color: var(--stein); margin-bottom: 3px; }
+.au-m { position: absolute; bottom: -30px; font-size: 11px; color: var(--stein); text-align: center; line-height: 1.15; }
+.au-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12px; color: var(--stein); margin: 0 0 8px; }
+.au-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 2px; margin-left: 6px; }
+.au-grp { background: var(--weiss); border: 1px solid var(--linie); border-left: 5px solid var(--gc); margin-bottom: 10px; animation: rise .3s ease both; }
+.au-gh, .au-ch { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: none; cursor: pointer; text-align: left; color: inherit; }
+.au-gh { min-height: 58px; padding: 8px 14px; }
+.au-gh:hover, .au-ch:hover { background: var(--himmel-2); }
+.au-gn { display: flex; flex-direction: column; width: 178px; flex: none; }
+.au-gn b { font: 800 16px var(--f-head); }
+.au-bar { flex: 1; min-width: 60px; max-width: 360px; height: 10px; background: #EEF0F2; border-radius: 5px; overflow: hidden; }
+.au-bar i { display: block; height: 100%; border-radius: 5px; transform-origin: left; animation: barX .7s cubic-bezier(.2,.8,.2,1) both; }
+.au-pct { width: 48px; text-align: right; font: 700 13px var(--f-mono); }
+.au-chev { color: var(--stein); font-size: 20px; transition: transform .2s; }
+.au-grp.open > .au-gh .au-chev, .au-cat.open > .au-ch .au-chev { transform: rotate(90deg); }
+.au-cat { border-top: 1px solid var(--linie-2); }
+.au-ch { min-height: 44px; padding: 6px 14px 6px 22px; font-size: 14px; }
+.au-ch b { width: 170px; flex: none; font-weight: 700; }
+.au-ch .muted { width: 18px; flex: none; text-align: right; }
+.au-rows { padding: 0 14px 10px 22px; animation: rise .22s ease both; overflow-x: auto; }
+.au-row { display: grid; grid-template-columns: minmax(170px, 1.3fr) minmax(150px, 1fr) 60px 70px auto 120px; gap: 10px; align-items: center; min-height: 38px; border-bottom: 1px solid var(--linie-2); font-size: 13px; }
+.au-rh { min-height: 28px; font: 700 10.5px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--stein); }
+.au-n { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.au-b { display: flex; align-items: center; gap: 8px; }
+.au-hm { display: flex; gap: 2px; }
+.au-hm i { display: block; width: 14px; height: 18px; border-radius: 2px; }
+.au-hm-h i { height: auto; background: none; font: 600 9.5px var(--f-mono); color: var(--stein); text-align: center; text-transform: none; letter-spacing: 0; }
+.au-st { justify-self: start; }
+@media (max-width: 760px) {
+  .au-page .page-h { gap: 6px 8px; }
+  .au-range { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .au-range button { flex: none; padding: 0 10px; }
+  .au-cols { gap: 3px; height: 120px; }
+  .au-v { font-size: 9px; }
+  .au-m { font-size: 9.5px; }
+  .au-gh { gap: 8px; padding: 8px 10px; }
+  .au-gn { width: auto; min-width: 0; flex: 1; }
+  .au-gh .au-bar { display: none; }
+  .au-ch { padding-left: 12px; gap: 8px; }
+  .au-ch b { width: auto; min-width: 0; flex: 1; }
+  .au-ch .au-bar { max-width: 90px; }
+  .au-rows { padding: 0 10px 8px; }
+  .au-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "n st" "b b" "hm hm"; row-gap: 4px; padding: 8px 0; }
+  .au-row > :nth-child(3), .au-row > :nth-child(4) { display: none; }
+  .au-rh { display: none; }
+  .au-n { grid-area: n; } .au-b { grid-area: b; } .au-hm { grid-area: hm; flex-wrap: wrap; } .au-st { grid-area: st; justify-self: end; }
+  .au-hm i { width: 12px; height: 14px; }
+}
