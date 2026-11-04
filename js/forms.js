@@ -705,33 +705,74 @@
   };
 
   /* ================================================== RESERVIEREN (im Magazin, für ein Projekt vorgesehen) */
+  /* zuletzt benutztes Magazin dieser Geräte (häufigstes) */
+  function lastMag(gs) {
+    var I = M.idx(), cnt = {}, best = null;
+    gs.forEach(function (g) {
+      var m = (I.ein[g.id] || []).filter(function (e) { return e.ort === 'magazin' && e.magazinId; }).sort(function (a, b) { return a.von < b.von ? 1 : -1; })[0];
+      if (m) { cnt[m.magazinId] = (cnt[m.magazinId] || 0) + 1; if (!best || cnt[m.magazinId] > cnt[best]) best = m.magazinId; }
+    });
+    return best;
+  }
   M.openReserve = function (ids) {
     var I = M.idx();
     var list = ids.map(function (id) { return I.ger[id]; }).filter(Boolean);
-    var mag = list.filter(function (g) { return M.info(g.id).isMag; }), andere = list.filter(function (g) { return !M.info(g.id).isMag; });
-    if (!mag.length) { M.toast('Reservieren geht nur für Geräte im Magazin. Geräte im Feld haben schon ein Projekt.', 'err'); return; }
-    var resv = mag.map(function (g) { return M.info(g.id).res; }), first = resv.find(Boolean) || null;
-    var same = first && resv.every(function (r) { return r && r.projektId === first.projektId; });
-    M.ctx = { kind: 'reserve', ids: mag.map(function (g) { return g.id; }) };
-    var b = mag.length === 1 ? '<div class="mv-from">' + M.symbol(mag[0].id, 32) + '<div><b>' + esc(mag[0].name) + '</b><span>' + esc(M.info(mag[0].id).ortText) + '</span></div></div>'
-      : '<p><b>' + mag.length + ' Geräte</b> im Magazin reservieren.</p><div class="dup-names">' + mag.slice(0, 30).map(function (g) { return '<span>' + esc(g.name) + '</span>'; }).join('') + (mag.length > 30 ? '<span>… +' + (mag.length - 30) + '</span>' : '') + '</div>';
-    if (andere.length) b += '<p class="hint small">' + andere.length + (andere.length === 1 ? ' Gerät ist' : ' Geräte sind') + ' nicht im Magazin und ' + (andere.length === 1 ? 'wird' : 'werden') + ' übersprungen: ' + esc(andere.slice(0, 6).map(function (g) { return g.name; }).join(', ')) + (andere.length > 6 ? ' …' : '') + '</p>';
-    M.ctx.n = mag.length;
+    var mag = [], feld = [], ohne = [], skip = [];
+    list.forEach(function (g) {
+      var i = M.info(g.id);
+      if (i.isMag) mag.push(g);
+      else if (!i.cur) { if (g.typ !== 'messstelle') ohne.push(g); }
+      else if (i.mccTs) skip.push(g.name + ' (MCC beim Tachymeter)');
+      else if (g.typ === 'tachymeter' || g.typ === 'messstelle') skip.push(g.name + ' (über «Ins Magazin»)');
+      else feld.push(g);
+    });
+    if (!mag.length && !feld.length && !ohne.length) { M.toast('Nichts zu reservieren' + (skip.length ? ': ' + skip.join(', ') : '.'), 'err'); return; }
+    // Vorwahl: gemeinsame Reservation bzw. gemeinsames Projekt, Position und Set der Geräte im Feld
+    var src = mag.map(function (g) { return M.info(g.id).res; }).concat(feld.map(function (g) { var c = M.info(g.id).cur; return { projektId: c.projektId, positionId: c.positionId, einheit: c.einheit }; })).filter(Boolean);
+    var first = src[0] || null, same = !!first && src.every(function (r) { return r.projektId === first.projektId; });   // Geräte ohne Projekt/Reservation zählen nicht
+    var samePos = same && src.every(function (r) { return (r.positionId || null) === (first.positionId || null) && (r.einheit || null) === (first.einheit || null); });
+    var hadRes = mag.some(function (g) { return M.info(g.id).res; });
+    var alle = mag.concat(feld, ohne);
+    M.ctx = { kind: 'reserve', ids: mag.map(function (g) { return g.id; }), feld: feld.map(function (g) { return g.id; }), ohne: ohne.map(function (g) { return g.id; }), n: alle.length };
+    var b = alle.length === 1 ? '<div class="mv-from">' + M.symbol(alle[0].id, 32) + '<div><b>' + esc(alle[0].name) + '</b><span>' + esc(M.info(alle[0].id).ortText) + '</span></div></div>'
+      : '<p><b>' + alle.length + ' Geräte</b> reservieren.</p><div class="dup-names">' + alle.slice(0, 30).map(function (g) { return '<span>' + esc(g.name) + '</span>'; }).join('') + (alle.length > 30 ? '<span>… +' + (alle.length - 30) + '</span>' : '') + '</div>';
+    if (feld.length || ohne.length) {
+      var since = feld.map(function (g) { return M.info(g.id).cur.von; }).sort()[0];
+      b += '<fieldset class="extra rs-feld"><legend>' + (feld.length ? feld.length + (feld.length === 1 ? ' Gerät steht' : ' Geräte stehen') + ' im Feld' : '') + (feld.length && ohne.length ? ' · ' : '') + (ohne.length ? ohne.length + ' ohne Standort' : '') + '</legend>' +
+        '<p class="small">Noch nicht montiert? Dann ins Magazin nehmen und für das Projekt reservieren.</p>' +
+        (feld.length ? '<label class="rad"><input type="radio" name="rs-fm" value="korr" checked> <span><b>Wurde nie montiert</b> – Einsatz im Feld in Magazin umwandeln (Korrektur, gilt rückwirkend ab ' + M.fmtDate(since) + '; nichts wird verrechnet)</span></label>' +
+          '<label class="rad"><input type="radio" name="rs-fm" value="datum"> <span><b>Wieder abgebaut</b> – ab dem Datum unten im Magazin (Zeit im Feld bleibt in der Historie)</span></label>' : '') +
+        '<div class="grid2">' + fld('Magazin', '<select id="rs-mag">' + M.magOptions(lastMag(feld.concat(ohne)) || (M.magazine()[0] || {}).id) + '</select>') +
+        fld('Im Magazin ab' + (feld.length ? ' (bei «wieder abgebaut»)' : ''), inp('rs-dat', M.today(), 'type="date"')) + '</div></fieldset>';
+    }
+    if (skip.length) b += '<p class="hint small">Übersprungen: ' + esc(skip.slice(0, 6).join(', ')) + (skip.length > 6 ? ' …' : '') + '</p>';
     b += M.projSelHtml('rs', same ? first.projektId : '').replace('Projekt (optional)', 'Reserviert für Projekt') + M.newProjBox('rs') +
-      '<div id="rs-posbox" class="posbox">' + M.posBoxHtml('rs', same ? first.projektId : '', same ? { positionId: first.positionId, einheit: first.einheit } : {}, mag.length) + '</div>' +
-      '<div class="grid2">' + fld('Montage geplant ab (optional)', inp('rs-ab', same ? first.ab || '' : '', 'type="date"')) +
-      fld('Bemerkung (optional)', inp('rs-bem', same ? first.bemerkung || '' : '', 'maxlength="120" placeholder="z.B. für Etappe 2"')) + '</div>' +
+      '<div id="rs-posbox" class="posbox">' + M.posBoxHtml('rs', same ? first.projektId : '', samePos ? { positionId: first.positionId, einheit: first.einheit } : {}, alle.length) + '</div>' +
+      '<div class="grid2">' + fld('Montage geplant ab (optional)', inp('rs-ab', same && first.ab ? first.ab : '', 'type="date"')) +
+      fld('Bemerkung (optional)', inp('rs-bem', same && first.bemerkung ? first.bemerkung : '', 'maxlength="120" placeholder="z.B. für Etappe 2"')) + '</div>' +
       '<p class="muted small">Die Geräte bleiben im Magazin und zählen nicht fürs Projekt (keine Amortisation, keine Abrechnung). Im Projekt erscheinen sie unter «Reserviert». Mit Offertposition und Set gehören sie schon zum Set: beim Montieren sind Projekt, Position und Set vorgewählt – jedes Gerät mit seinem eigenen Standort.</p>' +
       '<p class="form-err" id="rs-err" role="alert"></p>';
-    M.modal({ title: 'Reservieren', form: 'reserve', body: b, foot: foot('Reservieren', first ? '<button type="button" class="btn ghost danger-t" data-act="res-clear">Reservation aufheben</button>' : '') });
+    M.modal({ title: 'Reservieren', form: 'reserve', body: b, foot: foot('Reservieren', hadRes ? '<button type="button" class="btn ghost danger-t" data-act="res-clear">Reservation aufheben</button>' : '') });
   };
   M.submitReserve = function () {
-    var pid = val('rs-proj');
+    var c0 = M.ctx, pid = val('rs-proj');
     if (!pid || pid === M.NEU_PROJ) { $('rs-err').textContent = 'Bitte ein Projekt wählen.'; return; }
     var t = { projektId: pid }; readPos('rs', t);
-    M.setReserve(M.ctx.ids, { projektId: pid, positionId: t.positionId || null, einheit: t.positionId ? t.einheit || null : null, ab: val('rs-ab') || null, bemerkung: val('rs-bem') }).then(function (r) {
+    var r = { projektId: pid, positionId: t.positionId || null, einheit: t.positionId ? t.einheit || null : null, ab: val('rs-ab') || null, bemerkung: val('rs-bem') };
+    var magId = $('rs-mag') ? val('rs-mag') : null, dat = $('rs-dat') ? val('rs-dat') || M.today() : M.today();
+    var fm = document.querySelector('input[name=rs-fm]:checked'); fm = fm ? fm.value : 'korr';
+    if ((c0.feld.length || c0.ohne.length) && !magId) { $('rs-err').textContent = 'Bitte ein Magazin wählen.'; return; }
+    var steps = Promise.resolve(), wer = M.userKuerzel();
+    // im Feld, nie montiert: Einsatz in Magazin umwandeln (keine neue Zeile in der Historie)
+    if (fm === 'korr') c0.feld.forEach(function (id) { steps = steps.then(function () { return M.feldZuMagazin(id, magId); }); });
+    // wieder abgebaut bzw. ohne Standort: ab Datum ins Magazin
+    (fm === 'datum' ? c0.feld : []).concat(c0.ohne).forEach(function (id) {
+      steps = steps.then(function () { return M.move(id, { ort: 'magazin', magazinId: magId }, dat, { wer: wer, mitMcc: false }); });
+    });
+    steps.then(function () { return M.setReserve(c0.ids.concat(c0.feld, c0.ohne), r); }).then(function (res) {
       M.closeModal(); M.state.invSel = {}; M.refreshUI();
-      M.toast(r.n + (r.n === 1 ? ' Gerät' : ' Geräte') + ' reserviert für ' + M.projName(M.idx().proj[pid]));
+      M.toast(res.n + (res.n === 1 ? ' Gerät' : ' Geräte') + ' reserviert für ' + M.projName(M.idx().proj[pid]));
+      if (res.skip.length) M.toast('Nicht reserviert (nicht im Magazin): ' + res.skip.join(', '), 'err');
     });
   };
   M.clearReserve = function () {

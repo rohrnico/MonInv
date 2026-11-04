@@ -96,7 +96,7 @@
     if (!i.pos) return false;
     if (i.g.zustand === 'ausgemustert') return false;
     if (i.mccTs && !i.isMag) return false;          // MCC im Betrieb: gehört zum Tachymeter
-    if (i.ms) return false;                          // Gerät einer Messstelle: die Messstelle steht auf der Karte
+    if (i.ms && i.msBei) return false;               // Gerät bei seiner Messstelle: die Messstelle steht auf der Karte (mit eigenem Standort: einzeln)
     if (f.off[i.gruppe]) return false;
     if (i.isMag && !f.magazin) return false;
     if (!i.isMag && !f.feld) return false;

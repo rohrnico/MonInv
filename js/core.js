@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.6.6';
+  M.VERSION = '0.6.7';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -271,6 +271,9 @@
     }
     var eins = I.ein[gid] || [];
     var cur = eins.find(function (e) { return !e.bis; }) || null;
+    // Mitglied steht bei der Messstelle (gleicher Ort und gleiches Projekt) – sonst eigener Standort laut eigener Historie
+    var msCur = ms ? (I.ein[ms.id] || []).find(function (e) { return !e.bis; }) || null : null;
+    var msBei = !!(ms && cur && msCur && cur.ort === msCur.ort && (cur.projektId || null) === (msCur.projektId || null) && (cur.magazinId || null) === (msCur.magazinId || null));
     var isMag = !!(cur && cur.ort === 'magazin');
     var mag = isMag ? I.proj[cur.magazinId] || null : null;
     var proj = cur && cur.projektId ? I.proj[cur.projektId] || null : null;
@@ -327,7 +330,7 @@
       cur: cur, proj: proj, mag: mag, isMag: isMag, res: res, pos: pos, posSrc: posSrc,
       ortText: cur ? M.ortText(cur) : 'ohne Standort',
       eins: eins, amortSum: amortSum, nProjekte: Object.keys(projSet).length, nStandorte: nStandorte, restwert: restwert, ertrag: ertrag,
-      wart: wart, state: state, issue: issue, ortFehlt: ortFehlt, mccFehlt: mccFehlt, mccTs: mccTs, members: members, ms: ms,
+      wart: wart, state: state, issue: issue, ortFehlt: ortFehlt, mccFehlt: mccFehlt, mccTs: mccTs, members: members, ms: ms, msBei: msBei,
       kabel: I.kabByGer[gid] || []
     };
     I.derived[gid] = info;
@@ -498,7 +501,13 @@
     var wer = M.has(opts.wer) ? opts.wer : M.userKuerzel();
     var feld = t.ort !== 'magazin';
     var pre = [];
-    if (g.gruppeId && !opts.viaGruppe) { var gx = M.copy(g); gx.gruppeId = null; pre.push(M.put('geraete', gx)); g = gx; }
+    // Gerät einer Messstelle einzeln verschieben: ins Magazin oder innerhalb des Projekts der Messstelle bleibt es Mitglied
+    // (eigener Standort, z.B. noch nicht montiert und reserviert); in ein anderes Projekt verlässt es die Messstelle.
+    if (g.gruppeId && !opts.viaGruppe) {
+      var msCur0 = (I.ein[g.gruppeId] || []).find(function (e) { return !e.bis; });
+      var bleibt = !feld || (msCur0 && msCur0.ort === 'feld' && (msCur0.projektId || null) === (t.projektId || null));
+      if (!bleibt) { var gx = M.copy(g); gx.gruppeId = null; pre.push(M.put('geraete', gx)); g = gx; }
+    }
     var target = {
       ort: feld ? 'feld' : 'magazin',
       magazinId: feld ? null : t.magazinId,
@@ -574,6 +583,9 @@
     // Geräte einer Messstelle folgen ihr
     if (g.typ === 'messstelle') {
       (I.members[gid] || []).forEach(function (mid, n) {
+        // Mitglieder mit eigenem Standort (z.B. im Magazin reserviert) bleiben, wo sie sind
+        var mc = (I.ein[mid] || []).find(function (e) { return !e.bis; });
+        if (cur && mc && !(mc.ort === cur.ort && (mc.projektId || null) === (cur.projektId || null) && (mc.magazinId || null) === (cur.magazinId || null))) return;
         var a = opts.memberAmort ? opts.memberAmort(mid, n) : null;
         jobs.push(M.followTo(mid, Object.assign({}, target, a || {}), datum, wer, !!a));
       });
@@ -714,6 +726,17 @@
   };
   M.resCount = function (posId) {
     return M.state.data.einsaetze.filter(function (e) { return !e.bis && e.ort === 'magazin' && e.reserviert && e.reserviert.positionId === posId; }).length;
+  };
+  /* Gerät steht im Feld, wurde aber nie montiert: laufenden Feld-Einsatz in einen Magazin-Einsatz umwandeln (Korrektur) */
+  M.feldZuMagazin = function (gid, magId) {
+    var cur = (M.idx().ein[gid] || []).find(function (e) { return !e.bis; });
+    if (!cur || cur.ort !== 'feld') return Promise.resolve();
+    var c = M.copy(cur);
+    c.ort = 'magazin'; c.magazinId = magId; c.projektId = null; c.lat = null; c.lng = null; c.ortName = '';
+    c.positionId = null; c.einheit = null; c.planBis = null; c.planMonate = null; c.auftrag = '';
+    c.amortModus = 'pauschal'; c.amortBetrag = 0;
+    c.bemerkung = (c.bemerkung ? c.bemerkung + ' · ' : '') + 'korrigiert: nie montiert';
+    return M.put('einsaetze', c);
   };
   M.setReserve = function (ids, r) {
     var I = M.idx(), jobs = [], n = 0, skip = [], done = {}, wer = M.userKuerzel();

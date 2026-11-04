@@ -261,7 +261,8 @@
         '<div class="pa-grid">' + sec.join('') + '</div><div class="pa-foot">' + delMs + '</div></div>';
     }
     if (!i.mccTs) sec.push(act('move', gid, 'projekt', 'Projekt ändern'));
-    if (i.isMag && !i.ms) sec.push(act('reserve', gid, 'res', i.res ? 'Reservation ändern' : 'Reservieren'));
+    if (i.isMag) sec.push(act('reserve', gid, 'res', i.res ? 'Reservation ändern' : 'Reservieren'));
+    if (big && i.cur && !i.isMag && i.g.typ === 'sensor') sec.push(act('reserve', gid, 'res', 'Ins Magazin & reservieren'));
     if (i.cur && !i.isMag && !i.mccTs) sec.push(act('place', gid, 'pos', i.posSrc === 'eigen' ? 'Position ändern' : 'Position setzen'));
     if (i.wart) sec.push(act('wartung', gid, 'wartung', 'Wartung erfassen'));
     if (i.pos && !i.mccTs) sec.push(act('kabel-from', gid, 'kabel', 'Kabel zeichnen'));
@@ -286,7 +287,8 @@
     var h = '';
     if (!full) h += M.detailHead(gid) + M.detailActions(gid);
     if (i.members) return h + M.gruppeHtml(gid, full);
-    if (i.ms) h += '<div class="hint">Teil der Messstelle <button type="button" class="link-btn" data-act="open-any" data-id="' + i.ms.id + '">' + esc(i.ms.name) + '</button> und wechselt den Standort mit ihr. ' +
+    if (i.ms) h += '<div class="hint">Teil der Messstelle <button type="button" class="link-btn" data-act="open-any" data-id="' + i.ms.id + '">' + esc(i.ms.name) + '</button>' +
+      (i.msBei ? ' und wechselt den Standort mit ihr. ' : ', steht aber laut eigener Historie an einem eigenen Standort (' + esc(i.ortText) + ') und wechselt nicht mit. Mit der Montage im Projekt der Messstelle gehört es wieder zu ihr. ') +
       '<button type="button" class="link-btn" data-act="ms-remove" data-id="' + gid + '">Herauslösen</button></div>';
     if (i.wart) {
       var w = i.wart, pct = Math.min(100, Math.round(w.pct * 100));
@@ -449,8 +451,8 @@
         '<td class="c-sym">' + M.symbol(g.id, child ? 20 : 24) + '</td>' +
         '<td class="c-name' + (child ? ' ms-indent' : '') + '"><button type="button" class="link-btn strong" data-act="open" data-id="' + g.id + '">' + esc(g.name) + '</button></td>' +
         '<td class="c-kat">' + esc(i.kat ? i.kat.name : M.typLabel[g.typ]) + '</td>' +
-        '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.mccTs ? 'bei ' + i.mccTs.name : child ? 'mit der Messstelle' : i.ortText) + '</td>' +
-        '<td class="c-proj' + (child || i.proj || i.res || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (child ? '' : i.proj ? esc(M.projName(i.proj)) : i.res ? '<span class="res-t">res. ' + esc(M.projName(i.res.proj)) + '</span>' : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
+        '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.mccTs ? 'bei ' + i.mccTs.name : child && i.msBei ? 'mit der Messstelle' : i.ortText) + '</td>' +
+        '<td class="c-proj' + (child || i.proj || i.res || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (child && i.msBei ? '' : i.proj ? esc(M.projName(i.proj)) : i.res ? '<span class="res-t">res. ' + esc(M.projName(i.res.proj)) + '</span>' : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(g.hersteller || '') + '</td><td class="mono m-hide">' + esc(g.seriennummer || '') + '</td>' +
         '<td class="mono m-hide">' + M.fmtDate(g.kaufdatum) + '</td>' +
         '<td class="r mono m-hide fin">' + M.chf(g.wert) + '</td>' +
@@ -704,7 +706,7 @@
     if (!mag && M.can('fin')) h += posHtml(p);
     if (!mag && M.can('fin')) h += abrHtml(p);
     if (!mag) h += '<div class="sec-h"><span>Dokumente · ' + (M.can('fin') ? 'Offerte, Pläne' : 'Pläne, Berichte') + '</span></div>' + M.filesHtml('projekt', p.id, { compactUpload: true });
-    var resv = mag ? [] : M.state.data.geraete.filter(function (g) { var ii = M.info(g.id); return ii.res && ii.res.proj.id === p.id && !ii.ms && g.zustand !== 'ausgemustert'; })
+    var resv = mag ? [] : M.state.data.geraete.filter(function (g) { var ii = M.info(g.id); return ii.res && ii.res.proj.id === p.id && g.zustand !== 'ausgemustert'; })
       .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de', { numeric: true }); });
     if (resv.length) {
       h += '<div class="sec-h"><span>Reserviert · noch im Magazin</span><span class="muted">' + resv.length + (resv.length === 1 ? ' Gerät' : ' Geräte') + '</span></div><div class="chips-wrap">' +
