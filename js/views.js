@@ -587,7 +587,7 @@
           '<td>' + (akt.length ? '<b>' + akt.length + (P.art === 'set' ? (akt.length === 1 ? ' Set' : ' Sets') + '</b> · ' + nd + ' Geräte' : ' Stück</b>' + (nd > akt.length ? ' · ' + nd + ' Geräte' : '')) : '<span class="muted">keine laufend</span>') +
           (U.length > akt.length ? '<br><span class="muted small">' + (U.length - akt.length) + ' beendet</span>' : '') +
           (M.resCount(P.id) ? '<br><span class="res-t small">+' + M.resCount(P.id) + ' reserviert im Magazin</span>' : '') + '</td>' +
-          '<td class="r mono">' + f2(P.V) + '</td><td class="r mono">' + f2(P.B) + '</td><td class="r mono">' + (+P.W ? f2(P.W) : '–') + '</td>' +
+          '<td class="r mono">' + f2(P.V) + (M.amortPct(P) !== 100 ? '<br><span class="muted small" title="Anteil des Vorhaltens in der Amortisation">' + M.amortPct(P) + ' % Amort.</span>' : '') + '</td><td class="r mono">' + f2(P.B) + '</td><td class="r mono">' + (+P.W ? f2(P.W) : '–') + '</td>' +
           '<td class="r mono strong">' + M.chf(cur) + '</td><td>' + pmHtml(M.posMonate(P)) + '</td><td class="r"><span class="ic-btn" aria-hidden="true">✎</span></td></tr>';
       });
       grand += sub;

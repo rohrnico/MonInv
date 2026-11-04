@@ -728,6 +728,7 @@
 
   M.ACT = ACT; M.CHANGE = CHANGE;   // Erweiterungen (z.B. labels.js) melden hier eigene Aktionen an
   var INPUT = {
+    'po-pct': function (d, el) { var x = $('po-pct-info'); if (x) x.firstChild && (x.innerHTML = M.pctInfo(el.value) + x.innerHTML.slice(x.innerHTML.indexOf(' Im Set'))); },
     'plan-in': function (d) { M.planInfoUpdate(d.p); },
     'msa-q': function (d, el) {
       var q = el.value.trim().toLowerCase();

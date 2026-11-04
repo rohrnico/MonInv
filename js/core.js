@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.6.10';
+  M.VERSION = '0.6.11';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -209,8 +209,11 @@
     var P = e && e.positionId && M.idx().pos[e.positionId];
     if (!P) return null;
     var u = M.unitOf(e), sh = u ? u.anteil[e.geraetId] || 0 : 1;
-    return { P: P, u: u, anteil: sh, rate: (M.num(P.V) || 0) * sh };
+    return { P: P, u: u, anteil: sh, pct: M.amortPct(P), rate: (M.num(P.V) || 0) * M.amortPct(P) / 100 * sh };
   };
+  /* Anteil des Vorhaltens, der in die Amortisation fliesst (Prozent, Standard 100) */
+  M.amortPct = function (P) { var x = P ? M.num(P.amortPct) : null; return x === null || x === undefined || isNaN(x) ? 100 : Math.max(0, Math.min(100, x)); };
+  M.pctInfo = function (v) { var x = M.amortPct({ amortPct: v }); return x === 100 ? 'Vorhalten fliesst voll in die Amortisation der Geräte.' : x + ' % des Vorhaltens fliessen in die Amortisation der Geräte.'; };
   M.einsatzAmort = function (e) {
     if (!e || e.ort === 'magazin') return 0;
     // Vor dem Stichtag des Startwerts zählt nichts: das steckt im Startwert
@@ -224,7 +227,7 @@
   M.amortText = function (e) {
     if (!e || e.ort === 'magazin') return 'keine (Magazin)';
     var pr = M.posRate(e);
-    if (pr) return M.posLabel(pr.P) + ' · CHF ' + M.chf(pr.rate) + ' pro Monat' + (pr.u && pr.u.devs.length > 1 ? ' (' + Math.round(pr.anteil * 100) + ' % des Sets)' : '') + ' · bisher CHF ' + M.chf(M.einsatzAmort(e));
+    if (pr) return M.posLabel(pr.P) + ' · CHF ' + M.chf(pr.rate) + ' pro Monat' + (pr.pct !== 100 ? ' (' + pr.pct + ' % des Vorhaltens)' : '') + (pr.u && pr.u.devs.length > 1 ? ' (' + Math.round(pr.anteil * 100) + ' % des Sets)' : '') + ' · bisher CHF ' + M.chf(M.einsatzAmort(e));
     var b = M.num(e.amortBetrag) || 0;
     if (!b) return 'keine';
     return e.amortModus === 'monat' ? 'CHF ' + M.chf(b) + ' pro Monat · bisher CHF ' + M.chf(M.einsatzAmort(e)) : 'CHF ' + M.chf(b) + ' pauschal';

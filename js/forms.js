@@ -1019,8 +1019,9 @@
       '<button type="button" data-act="po-art" data-k="stk" class="' + (d.art !== 'set' ? 'on' : '') + '" aria-pressed="' + (d.art !== 'set') + '">Stückpreis · je Gerät</button></div><input type="hidden" id="po-art" value="' + (d.art === 'set' ? 'set' : 'stk') + '"></div></div>' +
       '<div class="po-preis"><span class="lbl" id="po-preislbl">Preis pro ' + (d.art === 'set' ? 'Set' : 'Gerät') + ' und Monat (Offerte)</span><div class="grid3">' +
       fld('Vorhalten CHF', inp('po-V', d.V, 'inputmode="decimal" class="r"')) + fld('Betrieb CHF', inp('po-B', d.B, 'inputmode="decimal" class="r"')) + fld('Wartung CHF', inp('po-W', d.W, 'inputmode="decimal" class="r"')) + '</div>' +
-      '<div class="grid3">' + fld('Offeriert: Monate total', inp('po-offMonate', d.offMonate, 'inputmode="numeric" class="r" placeholder="optional"')) + '</div>' +
-      '<p class="muted small">Vorhalten fliesst voll in die Amortisation der Geräte (im Set nach Anschaffungswert verteilt). Betrieb und Wartung laufen pro ' + (d.art === 'set' ? 'Set' : 'Gerät') + '.</p></div>';
+      '<div class="grid3">' + fld('Vorhalten in Amortisation', '<div class="unit-in"><input id="po-amortPct" value="' + esc(M.has(d.amortPct) && d.amortPct !== '' ? d.amortPct : 100) + '" inputmode="decimal" class="r" data-input="po-pct"><i>%</i></div>') +
+      fld('Offeriert: Monate total', inp('po-offMonate', d.offMonate, 'inputmode="numeric" class="r" placeholder="optional"')) + '</div>' +
+      '<p class="muted small" id="po-pct-info">' + M.pctInfo(d.amortPct) + ' Im Set nach Anschaffungswert verteilt. Betrieb und Wartung laufen pro ' + (d.art === 'set' ? 'Set' : 'Gerät') + '. Verrechnet wird immer der volle Vorhalte-Preis.</p></div>';
     // Geräte zuweisen
     b += '<fieldset class="extra"><legend>Geräte im Projekt</legend>';
     if (!cand.length) b += '<p class="muted small">Zurzeit steht kein Gerät im Projekt. Geräte lassen sich auch beim Platzieren oder mit «Projekt ändern» einer Position zuordnen.</p>';
@@ -1052,6 +1053,10 @@
     var d = c.pid ? M.copy(I.pos[c.pid]) : { id: M.uid('pos'), projektId: c.projektId };
     d.nr = val('po-nr'); d.text = val('po-text'); delete d.auftrag; delete d.Wp; delete d.kB; delete d.kW; d.gruppe = val('po-gruppe') || 'sen'; d.art = val('po-art') === 'set' ? 'set' : 'stk';
     ['V', 'B', 'W', 'offMonate'].forEach(function (k) { d[k] = M.num(val('po-' + k)); if (d[k] === null) d[k] = ''; });
+    var pct = M.num(val('po-amortPct'));
+    if (pct === null) pct = 100;
+    if (pct < 0 || pct > 100) { $('po-err').textContent = 'Anteil für die Amortisation: 0 bis 100 %.'; return; }
+    d.amortPct = pct;
     d.bemerkung = $('po-bem').value.trim();
     if (!d.text) { $('po-err').textContent = 'Bitte die Bezeichnung eingeben.'; return; }
     if (!M.has(d.V) || d.V === '') { $('po-err').textContent = 'Bitte den Preis für Vorhalten eingeben (0 ist möglich).'; return; }
