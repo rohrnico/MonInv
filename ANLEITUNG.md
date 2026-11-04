@@ -184,9 +184,9 @@ In der Zeitachse eines Projekts hat jedes Gerät eine Zeile; mehrere Einsätze i
 
 ## 4. Erweitern
 
-**App-Symbol:** Das R aus dem RISTAG-Logo mit Signal und «MonInv» (`assets/apple-touch-icon.png`, `assets/icon-192.png`, `assets/icon-512.png`, Browser-Tab: `assets/favicon.svg`; Angaben für den Startbildschirm in `manifest.webmanifest`). Auf dem iPhone: Safari › Teilen › **Zum Home-Bildschirm** – ein schon abgelegtes Symbol einmal entfernen und neu hinzufügen, damit das neue erscheint.
+**App-Symbol:** Das weisse R aus dem RISTAG-Logo auf RISTAG-Blau (`assets/apple-touch-icon.png`, `assets/icon-192.png`, `assets/icon-512.png`, Browser-Tab: `assets/favicon.svg`; Angaben für den Startbildschirm in `manifest.webmanifest`). Auf dem iPhone: Safari › Teilen › **Zum Home-Bildschirm** – ein schon abgelegtes Symbol einmal entfernen und neu hinzufügen, damit das neue erscheint.
 
-**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.7.7**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.7.7`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
+**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.7.8**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.7.8`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
 
 
 **Neue Attribute ohne Programmieren:** Einstellungen › Kategorien › Kategorie öffnen › **Zusatzfelder** (Text, Zahl, Datum). Die Felder erscheinen sofort in der Maske, im Detail und im Excel-Export.
