@@ -10,13 +10,16 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="apple-mobile-web-app-title" content="MonInv">
 <title>MonInv</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300468E'/%3E%3Cpath d='M16 6l10 18H6z' fill='%23A9C6E8'/%3E%3C/svg%3E">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.css">
-<link rel="stylesheet" href="css/app.css?v=0.7.6">
-<link rel="stylesheet" href="css/mobile.css?v=0.7.6">
+<link rel="stylesheet" href="css/app.css?v=0.7.7">
+<link rel="stylesheet" href="css/mobile.css?v=0.7.7">
 </head>
 <body>
 <header class="top">
@@ -66,10 +69,10 @@
 
 <nav class="tabbar" aria-label="Bereiche">
   <a href="#karte" data-view="karte"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M1 5l7-2 8 2 7-2v16l-7 2-8-2-7 2z"/><path d="M8 3v16M16 5v16"/></svg>Karte</a>
-  <a href="#inventar" data-view="inventar"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Inventar</a>
-  <a href="#tachymeter" data-view="tachymeter"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3l9 17H3z"/></svg>Tachymeter</a>
+  <a href="#inventar" data-view="inventar"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2.8l8.2 4.4v9.6L12 21.2l-8.2-4.4V7.2z"/><path d="M3.8 7.2L12 11.6l8.2-4.4M12 11.6v9.6"/><path d="M7.9 5l8.2 4.4v3.3"/></svg>Inventar</a>
+  <a href="#tachymeter" data-view="tachymeter"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="7.5" y="2.8" width="9" height="8.4" rx="2"/><circle cx="12" cy="7" r="2"/><path d="M9.5 13.6h5M12 13.6L6 21.5M12 13.6l6 7.9M12 13.6v7.9"/><path d="M18.8 4.6a3.8 3.8 0 0 1 0 4.8" class="t-acc"/></svg>Tachymeter</a>
   <a href="#projekte" data-view="projekte"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 10h16"/></svg>Projekte</a>
-  <a href="#einstellungen" data-view="einstellungen"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Mehr</a>
+  <a href="#einstellungen" data-view="einstellungen"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><circle cx="17" cy="17" r="3.6" class="t-acc"/></svg>Mehr</a>
 </nav>
 
 <div id="drawer" hidden></div>
@@ -82,19 +85,19 @@
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="vendor/markercluster/leaflet.markercluster.js"></script>
 <script src="vendor/msal/msal-browser.min.js"></script>
-<script src="js/symbols.js?v=0.7.6"></script>
-<script src="js/beispiel.js?v=0.7.6"></script>
-<script src="js/store.js?v=0.7.6"></script>
-<script src="js/core.js?v=0.7.6"></script>
-<script src="js/map.js?v=0.7.6"></script>
-<script src="js/views.js?v=0.7.6"></script>
-<script src="js/forms.js?v=0.7.6"></script>
-<script src="js/import.js?v=0.7.6"></script>
-<script src="js/app.js?v=0.7.6"></script>
-<script src="js/labels.js?v=0.7.6"></script>
-<script src="js/pdf.js?v=0.7.6"></script>
-<script src="js/auslastung.js?v=0.7.6"></script>
-<script src="js/mobile.js?v=0.7.6"></script>
-<script src="js/motion.js?v=0.7.6"></script>
+<script src="js/symbols.js?v=0.7.7"></script>
+<script src="js/beispiel.js?v=0.7.7"></script>
+<script src="js/store.js?v=0.7.7"></script>
+<script src="js/core.js?v=0.7.7"></script>
+<script src="js/map.js?v=0.7.7"></script>
+<script src="js/views.js?v=0.7.7"></script>
+<script src="js/forms.js?v=0.7.7"></script>
+<script src="js/import.js?v=0.7.7"></script>
+<script src="js/app.js?v=0.7.7"></script>
+<script src="js/labels.js?v=0.7.7"></script>
+<script src="js/pdf.js?v=0.7.7"></script>
+<script src="js/auslastung.js?v=0.7.7"></script>
+<script src="js/mobile.js?v=0.7.7"></script>
+<script src="js/motion.js?v=0.7.7"></script>
 </body>
 </html>

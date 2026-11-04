@@ -525,7 +525,10 @@ code { font-family: var(--f-mono); font-size: .92em; background: var(--nebel); p
   }
   .tabbar a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #BFD3EA; text-decoration: none; font: 600 11.5px var(--f-head); }
   .tabbar a.on { color: #fff; box-shadow: inset 0 3px 0 var(--signal); }
-  .tabbar svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+  .tabbar svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; transition: transform .18s ease; }
+  .tabbar .t-acc { stroke: var(--signal); }
+  .tabbar a.on svg { transform: translateY(-1px) scale(1.06); }
+  .tabbar a.on .t-acc { fill: none; }
   main { padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); }
   .side { position: absolute; left: 0; top: 0; bottom: 0; z-index: 700; transform: translateX(-105%); transition: transform .2s; width: 270px; box-shadow: 8px 0 24px rgba(0,21,42,.2); }
   .side-open .side { transform: none; }
