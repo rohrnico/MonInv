@@ -1028,3 +1028,9 @@ form .posbox:not(:empty) { margin-top: 14px; }
   .rl-m { flex-basis: calc(100% - 50px); }
   .rl-sel { flex: 1; } .rl-sel .sel-sm { width: 100%; max-width: none; height: 42px; }
 }
+
+/* RISTAG-Logo oben rechts */
+.top-logo { display: block; flex: none; height: 38px; width: auto; margin-left: 4px; padding-left: 16px; border-left: 1px solid var(--linie); box-sizing: content-box; }
+@media (max-width: 1280px) { .top-logo { height: 32px; padding-left: 12px; } .nav a { white-space: nowrap; padding: 10px 9px; } .top .ver { display: none; } }
+@media (max-width: 1200px) and (min-width: 1081px) { .top { gap: 12px; } .top .search { width: 180px; } .top .src { display: none; } }
+@media (max-width: 760px) { .top-logo { display: none; } }
