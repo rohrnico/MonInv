@@ -738,6 +738,11 @@
       // eine Zeile pro Gerät; mehrere Einsätze (z.B. Standortwechsel im Projekt) als Balken nebeneinander
       var rows = [], byG = {};
       eins.forEach(function (e) { if (!I.ger[e.geraetId]) return; if (!byG[e.geraetId]) { byG[e.geraetId] = []; rows.push(e.geraetId); } byG[e.geraetId].push(e); });
+      // sortiert nach Historie (erster Einsatz im Projekt), bei gleichem Datum nach Name (IN-2 vor IN-10)
+      rows.sort(function (a, b) {
+        var va = byG[a][0].von, vb = byG[b][0].von;
+        return va < vb ? -1 : va > vb ? 1 : String(I.ger[a].name).localeCompare(String(I.ger[b].name), 'de', { numeric: true });
+      });
       rows.forEach(function (gid) {
         var g = I.ger[gid], i = M.info(gid), grp = S.GRUPPEN[i.gruppe], es = byG[gid], sum = 0, bars = '';
         es.forEach(function (e) {
