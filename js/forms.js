@@ -12,6 +12,32 @@
   function finFld(label, inner) { return fld(label, inner, 'fin'); }
   function inp(id, v, attrs) { return '<input id="' + id + '" value="' + esc(v === null || v === undefined ? '' : v) + '" ' + (attrs || '') + '>'; }
 
+  /* ---------- Optionale Datumsfelder leeren können
+     iPad und iPhone bieten im Datumswähler keinen Knopf zum Leeren – darum ein × neben jedem Datumsfeld,
+     das nicht Pflicht ist (z.B. «Bis (leer = laufend)»). Gilt für alle Dialoge, auch später nachgeladene Felder. */
+  function dateSync(el) { if (el.parentNode && el.parentNode.classList) el.parentNode.classList.toggle('has-v', !!el.value); }
+  M.dateClearInit = function (root) {
+    (root || document).querySelectorAll('input[type=date]:not([required]):not([data-dc])').forEach(function (el) {
+      el.setAttribute('data-dc', '1');
+      var w = document.createElement('span'); w.className = 'date-wrap';
+      el.parentNode.insertBefore(w, el); w.appendChild(el);
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'date-x'; b.setAttribute('data-act', 'date-clear'); b.setAttribute('aria-label', 'Datum leeren'); b.title = 'Datum leeren'; b.textContent = '×';
+      w.appendChild(b); dateSync(el);
+    });
+  };
+  M.dateClear = function (btn) {
+    var el = btn.parentNode.querySelector('input[type=date]'); if (!el) return;
+    el.value = ''; dateSync(el);
+    el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  document.addEventListener('input', function (e) { if (e.target.matches && e.target.matches('input[type=date][data-dc]')) dateSync(e.target); });
+  document.addEventListener('change', function (e) { if (e.target.matches && e.target.matches('input[type=date][data-dc]')) dateSync(e.target); });
+  (function () {
+    var mr = document.getElementById('modal-root');
+    if (mr && window.MutationObserver) new MutationObserver(function () { M.dateClearInit(mr); }).observe(mr, { childList: true, subtree: true });
+  })();
+
   /* ---------- Rahmen */
   M.modal = function (o) {
     var root = $('modal-root');

@@ -547,6 +547,7 @@
       if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(mail)) { M.toast('Bitte eine gültige E-Mail-Adresse eingeben (z.B. vorname.name@ristag.ch).', 'err'); return; }
       M.setRolle(mail, r).then(function () { M.toast(mail + ' ist jetzt ' + M.ROLLEN[r].name); });
     },
+    'date-clear': function (d, el) { M.dateClear(el); },
     'check-open': function () {
       M.state.drawer = null; M.go('einstellungen');
       setTimeout(function () { var s = $('sec-check'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);

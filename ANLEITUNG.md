@@ -77,6 +77,7 @@ Wer im Testbetrieb schon echte Geräte erfasst hat: dort unter Einstellungen **S
 - **Projekte:** zuerst die Liste, ein Tipp öffnet das Projekt, «‹ Alle Projekte» (oder nochmals unten auf «Projekte») führt zurück. Breite Tabellen (Positionen, Abrechnung, Zeitachse) lassen sich seitlich wischen.
 - **Dialoge und Gerätefenster** öffnen im Vollbild; die Knöpfe (Speichern, Abbrechen) stehen fest unten, die Aktionen im Gerätefenster in einer wischbaren Zeile.
 - Eingabefelder haben 16 px Schrift, damit das iPhone beim Tippen nicht hineinzoomt; Notch und Home-Balken werden freigehalten.
+- Datumsfelder, die leer sein dürfen (z.B. «Bis (leer = laufend)», geplante Laufzeit, letzte Wartung), haben ein **×** zum Leeren – iPad und iPhone bieten im Datumswähler keinen solchen Knopf.
 
 ---
 
@@ -160,7 +161,7 @@ In der Zeitachse eines Projekts hat jedes Gerät eine Zeile; mehrere Einsätze i
 
 ## 4. Erweitern
 
-**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.6.2**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.6.2`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
+**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.6.3**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.6.3`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
 
 
 **Neue Attribute ohne Programmieren:** Einstellungen › Kategorien › Kategorie öffnen › **Zusatzfelder** (Text, Zahl, Datum). Die Felder erscheinen sofort in der Maske, im Detail und im Excel-Export.

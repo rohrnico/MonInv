@@ -1059,3 +1059,10 @@ form .posbox:not(:empty) { margin-top: 14px; }
 .set-apply .set-devs.off { opacity: .4; pointer-events: none; }
 .set-apply .set-devs .chk { white-space: normal; }
 @media (max-width: 760px) { .set-apply .set-devs { grid-template-columns: 1fr; margin-left: 0; } }
+
+/* Datumsfeld mit × zum Leeren */
+.date-wrap { display: flex; align-items: stretch; gap: 6px; width: 100%; min-width: 0; }
+.date-wrap > input { flex: 1; min-width: 0; }
+.date-x { display: none; flex: none; width: 42px; border: 1px solid #C9C8C7; background: var(--weiss); color: var(--stein); font-size: 20px; line-height: 1; cursor: pointer; border-radius: 2px; }
+.date-x:hover { color: var(--rot); border-color: var(--rot); }
+.date-wrap.has-v .date-x { display: block; }
