@@ -852,10 +852,12 @@ body.viewer-open { overflow: hidden; }
 .po-preis .lbl { font: 700 11.5px var(--f-head); letter-spacing: .06em; text-transform: uppercase; color: var(--blau); }
 .po-preis input.r { text-align: right; }
 .po-devs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 14px; max-height: 280px; overflow: auto; border: 1px solid var(--linie); padding: 6px 10px; }
-.po-dev { white-space: normal; align-items: center; min-height: 40px; }
-.po-dev b { font-size: 13.5px; white-space: nowrap; }
+.po-dev { display: grid; grid-template-columns: 18px 20px minmax(0, 1fr); column-gap: 8px; row-gap: 0; align-items: center; white-space: normal; min-height: 40px; padding: 4px 0; }
+.po-dev > input { grid-row: 1 / span 2; }
+.po-dev > .sym, .po-dev > svg, .po-dev > span:not(.muted) { grid-row: 1 / span 2; }
+.po-dev b { font-size: 13.5px; overflow-wrap: anywhere; line-height: 1.3; }
 .abr-tbl .link-btn { font-family: var(--f-body); }
-.po-dev .muted { margin-left: auto; text-align: right; }
+.po-dev .muted { grid-column: 3; text-align: left; line-height: 1.3; }
 .danger-t { color: var(--rot) !important; border-color: transparent !important; }
 @media (max-width: 760px) { .grid-pos { grid-template-columns: 80px minmax(0, 1fr); } .grid-pos .fld:last-child { grid-column: 1 / -1; } .ab-cols { gap: 4px; } .ab-top { font-size: 10px; } }
 .abr-tbl td, .abr-tbl th { white-space: nowrap; }

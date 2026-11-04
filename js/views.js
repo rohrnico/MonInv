@@ -560,9 +560,13 @@
     var max = Math.max(m.off, m.geplant, m.verr, 1), over = m.off && m.geplant > m.off, overV = m.off && m.verr > m.off;
     var bar = '<span class="pm-bar"><i class="pm-g" style="width:' + (m.geplant / max * 100).toFixed(1) + '%"></i><i class="pm-v" style="width:' + (m.verr / max * 100).toFixed(1) + '%"></i>' +
       (m.off ? '<i class="pm-o" style="left:' + (m.off / max * 100).toFixed(1) + '%"></i>' : '') + '</span>';
-    var t = '<span class="mono">' + m.verr + ' · ' + (!m.mitPlan ? '<span class="muted" title="keine Laufzeit geplant">–</span>' : m.geplant + (m.offen ? '<span class="muted" title="' + m.offen + (m.offen === 1 ? ' laufende Einheit' : ' laufende Einheiten') + ' ohne geplante Laufzeit: gezählt bis heute">+</span>' : '')) + ' · ' + (m.off || '–') + '</span>';
+    var offT = !m.off ? '–' : m.offStk ? '<span title="' + m.offStk + ' Monate pro Gerät × ' + m.n + (m.n === 1 ? ' Gerät' : ' Geräte') + '">' + m.off + '</span>' : m.off;
+    var t = '<span class="mono">' + m.verr + ' · ' + (!m.mitPlan ? '<span class="muted" title="keine Laufzeit geplant">–</span>' : m.geplant + (m.offen ? '<span class="muted" title="' + m.offen + (m.offen === 1 ? ' laufende Einheit' : ' laufende Einheiten') + ' ohne geplante Laufzeit: gezählt bis heute">+</span>' : '')) + ' · ' + offT + '</span>';
     // Laufzeit und Offertmonate sind freiwillig: Hinweise nur, wenn eine Offertmenge erfasst ist
-    var note = !m.off ? '' : overV ? '<span class="pm-n bad">Offerte überschritten</span>' : over ? '<span class="pm-n warn">Plan über Offerte (+' + (m.geplant - m.off) + ')</span>' : '<span class="pm-n ok">im Rahmen</span>';
+    var geraete = function (n) { return n + (n === 1 ? ' Gerät' : ' Geräte'); };
+    var note = !m.off ? '' : overV ? '<span class="pm-n bad">Offerte überschritten</span>' : over ? '<span class="pm-n warn">Plan über Offerte (+' + (m.geplant - m.off) + ')</span>' :
+      m.ueberV ? '<span class="pm-n bad">' + geraete(m.ueberV) + ' über ' + m.offStk + ' Mt.</span>' : m.ueberP ? '<span class="pm-n warn">' + geraete(m.ueberP) + ' geplant über ' + m.offStk + ' Mt.</span>' : '<span class="pm-n ok">im Rahmen</span>';
+    if (m.offStk) note += '<span class="pm-n">' + m.offStk + ' Mt. pro Gerät</span>';
     return '<div class="pm">' + t + bar + note + '</div>';
   }
   function posHtml(p) {

@@ -1020,7 +1020,7 @@
       '<div class="po-preis"><span class="lbl" id="po-preislbl">Preis pro ' + (d.art === 'set' ? 'Set' : 'Gerät') + ' und Monat (Offerte)</span><div class="grid3">' +
       fld('Vorhalten CHF', inp('po-V', d.V, 'inputmode="decimal" class="r"')) + fld('Betrieb CHF', inp('po-B', d.B, 'inputmode="decimal" class="r"')) + fld('Wartung CHF', inp('po-W', d.W, 'inputmode="decimal" class="r"')) + '</div>' +
       '<div class="grid3">' + fld('Vorhalten in Amortisation', '<div class="unit-in"><input id="po-amortPct" value="' + esc(M.has(d.amortPct) && d.amortPct !== '' ? d.amortPct : 100) + '" inputmode="decimal" class="r" data-input="po-pct"><i>%</i></div>') +
-      fld('Offeriert: Monate total', inp('po-offMonate', d.offMonate, 'inputmode="numeric" class="r" placeholder="optional"')) + '</div>' +
+      fld('<span id="po-offlbl">' + offLbl(d.art) + '</span>', inp('po-offMonate', d.offMonate, 'inputmode="numeric" class="r" placeholder="optional"')) + '</div>' +
       '<p class="muted small" id="po-pct-info">' + M.pctInfo(d.amortPct) + ' Im Set nach Anschaffungswert verteilt. Betrieb und Wartung laufen pro ' + (d.art === 'set' ? 'Set' : 'Gerät') + '. Abgerechnet wird immer der volle Vorhalte-Preis.</p></div>';
     // Geräte zuweisen
     b += '<fieldset class="extra"><legend>Geräte im Projekt</legend>';
@@ -1039,6 +1039,8 @@
     M.modal({ title: (P ? 'Offertposition ' + (P.nr || '') : 'Neue Offertposition') + ' · ' + M.projName(proj), form: 'position', wide: true, body: b, noFocus: !!P,
       foot: (P ? '<button type="button" class="btn ghost danger-t" data-act="pos-del" data-id="' + P.id + '">Offertposition löschen</button>' : '') + '<span class="grow"></span><button type="button" class="btn ghost" data-act="modal-close">Abbrechen</button><button type="submit" class="btn">Speichern</button>' });
   };
+  function offLbl(art) { return art === 'set' ? 'Offeriert: Monate total' : 'Offeriert: Monate pro Gerät'; }
+  M.offLbl = offLbl;
   function nextNr(ps) {
     var last = ps.map(function (x) { return x.nr || ''; }).sort(function (a, b) { return a.localeCompare(b, 'de', { numeric: true }); }).pop();
     if (!last) return '1.1';

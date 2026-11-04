@@ -466,6 +466,7 @@
       document.querySelectorAll('[data-act=po-art]').forEach(function (b) { var on = b.getAttribute('data-k') === d.k; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
       var sb = $('po-setbox'); if (sb) sb.hidden = d.k !== 'set';
       $('po-preislbl').textContent = 'Preis pro ' + (d.k === 'set' ? 'Set' : 'Gerät') + ' und Monat (Offerte)';
+      var ol = $('po-offlbl'); if (ol) ol.textContent = M.offLbl(d.k);
     },
     'plan-mode': function (d) { M.planSetMode(d.p, d.k); },
     'bulk-plan': function () { M.openLaufzeit(selectedIds()); },

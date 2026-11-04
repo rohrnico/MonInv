@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.7.1';
+  M.VERSION = '0.7.2';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -1103,15 +1103,22 @@
   };
   /* Monate einer Position: verrechnet bis heute, geplant (ganze Laufzeit), offeriert */
   M.posMonate = function (P) {
-    var r = { verr: 0, geplant: 0, offen: 0, mitPlan: 0, off: M.num(P.offMonate) || 0 };
+    var r = { verr: 0, geplant: 0, offen: 0, mitPlan: 0, off: M.num(P.offMonate) || 0, stk: P.art !== 'set', n: 0, ueberV: 0, ueberP: 0 };
+    var proStk = r.off;
     M.posUnits(P.id).list.forEach(function (u) {
-      var f = M.monatsAnteile(u.eins.map(function (e) { return [e.von, e.bis]; })), n = 0;
+      var f = M.monatsAnteile(u.eins.map(function (e) { return [e.von, e.bis]; })), n = 0, g;
       Object.keys(f).forEach(function (k) { n += f[k]; });
-      r.verr += n;
-      if (!u.aktiv) { r.geplant += n; return; }
-      var pb = M.unitPlanBis(u);
-      if (pb) { r.geplant += Math.max(n, M.monateZwischen(u.von, pb)); r.mitPlan++; } else { r.geplant += n; r.offen++; }
+      r.verr += n; r.n++;
+      if (!u.aktiv) g = n;
+      else {
+        var pb = M.unitPlanBis(u);
+        if (pb) { g = Math.max(n, M.monateZwischen(u.von, pb)); r.mitPlan++; } else { g = n; r.offen++; }
+      }
+      r.geplant += g;
+      if (r.stk && proStk) { if (n > proStk) r.ueberV++; else if (g > proStk) r.ueberP++; }
     });
+    // Stückpreis: offeriert sind Monate je Gerät – die Offerte der Position = Monate × Anzahl Geräte
+    if (r.stk && proStk) { r.offStk = proStk; r.off = proStk * Math.max(1, r.n); }
     return r;
   };
   M.abrPosten = function (A) {
