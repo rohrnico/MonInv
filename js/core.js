@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.6.7';
+  M.VERSION = '0.6.8';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -879,7 +879,12 @@
     M.fillOrtName(c.id);
     var g = I.ger[gid];
     if (g && g.typ === 'tachymeter' && g.mccId) jobs.push(M.setPos(g.mccId, lat, lng));
-    if (g && g.typ === 'messstelle') (I.members[gid] || []).forEach(function (mid) { jobs.push(M.setPos(mid, lat, lng, { viaGruppe: true })); });
+    // Messstelle: nur Mitglieder, die bei ihr stehen – Mitglieder mit eigenem Standort (z.B. im Magazin reserviert) bleiben
+    if (g && g.typ === 'messstelle') (I.members[gid] || []).forEach(function (mid) {
+      var mc = (I.ein[mid] || []).find(function (e) { return !e.bis; });
+      if (mc && !(mc.ort === cur.ort && (mc.projektId || null) === (cur.projektId || null))) return;
+      jobs.push(M.setPos(mid, lat, lng, { viaGruppe: true }));
+    });
     return Promise.all(jobs);
   };
 

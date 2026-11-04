@@ -478,7 +478,10 @@
         '<td class="c-sym">' + M.symbol(g.id, 24) + '</td>' +
         '<td class="c-name"><span class="ms-nm"><button type="button" class="ms-tog" data-act="inv-open" data-id="' + g.id + '" aria-expanded="' + !!isOpen + '" aria-label="' + (isOpen ? 'Geräte zuklappen' : 'Geräte aufklappen') + '">' + (isOpen ? '▾' : '▸') + '</button>' +
         '<button type="button" class="link-btn strong" data-act="open" data-id="' + g.id + '">' + esc(g.name) + '</button></span></td>' +
-        '<td class="c-kat">Messstelle · ' + mem.length + ' Geräte</td>' +
+        '<td class="c-kat">Messstelle · ' + mem.length + ' Geräte' + (function () {
+          var weg = mem.filter(function (m) { return !M.info(m.id).msBei; }), res = weg.filter(function (m) { return M.info(m.id).res; }).length;
+          return weg.length ? '<br><span class="small ' + (res ? 'res-t' : 'muted') + '">' + (res ? res + ' reserviert im Magazin' : '') + (weg.length > res ? (res ? ' · ' : '') + (weg.length - res) + ' an eigenem Standort' : '') + '</span>' : '';
+        })() + '</td>' +
         '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.ortText) + '</td>' +
         '<td class="c-proj">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(her.length === 1 ? her[0] : her.length ? 'gemischt' : '') + '</td><td class="muted m-hide">' + mem.length + ' Stk.</td>' +
