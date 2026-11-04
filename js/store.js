@@ -240,9 +240,35 @@
     });
   };
 
+  /* Website suchen. Stimmt der Host in config.js nicht (z.B. ristag.sharepoint.com statt des echten Namens),
+     fragt die App Microsoft nach dem SharePoint-Namen der Firma und versucht es damit nochmals. */
+  SharePointStore.prototype._findSite = function () {
+    var self = this, site = String(this.cfg.site).trim();
+    var path = site.indexOf(':') > 0 ? site.slice(site.indexOf(':') + 1) : '/sites/Monitoring';
+    return this._graph('GET', '/sites/' + site + '?$select=id').catch(function (e) {
+      if (!/hostname|not found|itemNotFound|invalidRequest/i.test(e.message || '')) throw e;
+      return self._graph('GET', '/sites/root?$select=siteCollection,webUrl').then(function (root) {
+        var host = root && root.siteCollection && root.siteCollection.hostname;
+        if (!host) throw e;
+        var real = host + ':' + path;
+        if (real.toLowerCase() === site.toLowerCase()) {
+          throw new Error('SharePoint-Website «' + path + '» wurde auf ' + host + ' nicht gefunden. In config.js bei «site» den Pfad der Website eintragen, z.B. ' + host + ':/sites/Monitoring (steht in der Adresszeile, wenn die Website offen ist).');
+        }
+        return self._graph('GET', '/sites/' + real + '?$select=id').then(function (s) {
+          self.siteFix = real;
+          if (window.M && M.toast) setTimeout(function () { M.toast('Hinweis: In config.js bei «site» bitte ' + real + ' eintragen (der SharePoint-Name der Firma ist ' + host + ').'); }, 2500);
+          console.warn('MonInv: site in config.js korrigieren auf', real);
+          return s;
+        }, function () {
+          throw new Error('Euer SharePoint heisst ' + host + ', nicht wie in config.js angegeben. Dort bei «site» eintragen: ' + real + ' – und prüfen, ob die Website «' + path + '» existiert und du Zugriff hast.');
+        });
+      });
+    });
+  };
+
   SharePointStore.prototype._resolveSite = function () {
     var self = this;
-    return this._graph('GET', '/sites/' + this.cfg.site + '?$select=id').then(function (s) {
+    return this._findSite().then(function (s) {
       self.siteId = s.id;
       return self._graph('GET', '/sites/' + self.siteId + '/lists?$select=id,displayName&$top=999');
     }).then(function (r) {
