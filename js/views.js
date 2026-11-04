@@ -419,6 +419,7 @@
         '<button type="button" class="btn sm inv" data-act="bulk-plan">Laufzeit …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-mag">Ins Magazin …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-res">Reservieren …</button>' +
+        '<button type="button" class="btn sm inv" data-act="bulk-hist">Historie anpassen …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-zst">Zustand ändern …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-labels">Etiketten …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-del">Löschen …</button>' +
@@ -579,7 +580,8 @@
         rows += '<tr class="pos-row" data-act="pos-edit" data-id="' + P.id + '" style="--gc:' + G.c + '"><td class="mono strong">' + esc(P.nr || '') + '</td>' +
           '<td><b>' + esc(P.text || '') + '</b><br><span class="muted small">' + (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') + '</span></td>' +
           '<td>' + (akt.length ? '<b>' + akt.length + (P.art === 'set' ? (akt.length === 1 ? ' Set' : ' Sets') + '</b> · ' + nd + ' Geräte' : ' Stück</b>' + (nd > akt.length ? ' · ' + nd + ' Geräte' : '')) : '<span class="muted">keine laufend</span>') +
-          (U.length > akt.length ? '<br><span class="muted small">' + (U.length - akt.length) + ' beendet</span>' : '') + '</td>' +
+          (U.length > akt.length ? '<br><span class="muted small">' + (U.length - akt.length) + ' beendet</span>' : '') +
+          (M.resCount(P.id) ? '<br><span class="res-t small">+' + M.resCount(P.id) + ' reserviert im Magazin</span>' : '') + '</td>' +
           '<td class="r mono">' + f2(P.V) + '</td><td class="r mono">' + f2(P.B) + '</td><td class="r mono">' + (+P.W ? f2(P.W) : '–') + '</td>' +
           '<td class="r mono strong">' + M.chf(cur) + '</td><td>' + pmHtml(M.posMonate(P)) + '</td><td class="r"><span class="ic-btn" aria-hidden="true">✎</span></td></tr>';
       });
@@ -706,7 +708,7 @@
       .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de', { numeric: true }); });
     if (resv.length) {
       h += '<div class="sec-h"><span>Reserviert · noch im Magazin</span><span class="muted">' + resv.length + (resv.length === 1 ? ' Gerät' : ' Geräte') + '</span></div><div class="chips-wrap">' +
-        resv.map(function (g) { var ii = M.info(g.id); return '<button type="button" class="dev-chip res-chip" data-act="open" data-id="' + g.id + '" title="' + esc(ii.ortText + (ii.res.bemerkung ? ' · ' + ii.res.bemerkung : '')) + '">' + M.symbol(g.id, 22) + '<span>' + esc(g.name) + '</span>' + (ii.res.ab ? '<span class="muted small">ab ' + M.fmtDate(ii.res.ab) + '</span>' : '') + '</button>'; }).join('') + '</div>' +
+        resv.map(function (g) { var ii = M.info(g.id); return '<button type="button" class="dev-chip res-chip" data-act="open" data-id="' + g.id + '" title="' + esc(ii.ortText + (ii.res.bemerkung ? ' · ' + ii.res.bemerkung : '')) + '">' + M.symbol(g.id, 22) + '<span>' + esc(g.name) + '</span>' + (ii.res.positionId && M.idx().pos[ii.res.positionId] ? '<span class="muted small">Pos. ' + esc(M.idx().pos[ii.res.positionId].nr || '?') + '</span>' : '') + (ii.res.ab ? '<span class="muted small">ab ' + M.fmtDate(ii.res.ab) + '</span>' : '') + '</button>'; }).join('') + '</div>' +
         '<p class="muted small">Beim «Gerät platzieren» oder «Projekt ändern» ist dieses Projekt schon vorgewählt; mit dem Montieren endet die Reservation.</p>';
     }
     if (jetzt.length) {

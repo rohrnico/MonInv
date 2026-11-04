@@ -198,8 +198,13 @@
     if (P && P.art === 'set') {
       var units = M.posUnits(P.id).list.filter(function (u) { return u.aktiv; });
       var curKey = sel.einheit ? 'S:' + sel.einheit : null;
+      var resK = M.resSets(P.id), known = {};
+      units.forEach(function (u) { known[u.key.slice(2)] = 1; });
+      var extra = Object.keys(resK).filter(function (k) { return !known[k]; });
+      if (sel.einheit && !known[sel.einheit] && extra.indexOf(sel.einheit) < 0) extra.push(sel.einheit);
       h += fld('Set', '<select id="' + p + '-einheit">' + opt('neu', n > 1 ? 'Neues Set aus diesen ' + n + ' Geräten' : 'Neues Set', !curKey) +
-        units.map(function (u) { return opt(u.key.slice(2), M.unitLabel(P, u), u.key === curKey); }).join('') + '</select>');
+        units.map(function (u) { var k = u.key.slice(2); return opt(k, M.unitLabel(P, u) + (resK[k] ? ' · +' + resK[k] + ' reserviert' : ''), u.key === curKey); }).join('') +
+        extra.map(function (k) { return opt(k, resK[k] ? 'Set mit ' + resK[k] + ' reservierten Geräten (noch nicht montiert)' : 'bisheriges Set', 'S:' + k === curKey); }).join('') + '</select>');
     }
     if (P) h += '<div class="pos-chips"><span><i>Vorhalten</i>' + M.chf(P.V) + '</span><span><i>Betrieb</i>' + M.chf(P.B) + '</span><span><i>Wartung</i>' + M.chf(P.W) + '</span><em>CHF pro ' + (P.art === 'set' ? 'Set' : 'Gerät') + ' und Monat</em></div>';
     else if (!ps.length) h += '<p class="muted small pos-hint">Position direkt hier erfassen – oder später unter Projekte › Offerte &amp; Positionen.</p>';
@@ -231,6 +236,7 @@
   };
   M.newPosAdd = function (p) {
     var projektId = val(p + '-proj'), err = $(p + '-npos-err');
+    if (projektId === KEEP && M.ctx) projektId = M.ctx.hbProj;
     var d = { id: M.uid('pos'), projektId: projektId, nr: val(p + '-npnr'), text: val(p + '-nptext'), gruppe: val(p + '-npgr') || 'sen', art: val(p + '-npart') === 'set' ? 'set' : 'stk', offMonate: '', bemerkung: '' };
     ['V', 'B', 'W'].forEach(function (k) { var x = M.num(val(p + '-np' + k)); d[k] = x === null ? (k === 'V' ? '' : 0) : x; });
     if (!projektId) { err.textContent = 'Zuerst ein Projekt wählen.'; return; }
@@ -616,6 +622,88 @@
   };
 
   /* ================================================== VERSCHIEBEN */
+  /* ================================================== HISTORIE MEHRERER GERÄTE ANPASSEN
+     Je Gerät der laufende Einsatz (sonst der letzte). Leere Felder bleiben unverändert. */
+  var KEEP = '__keep';
+  M.histBulkPick = function (ids) {
+    var I = M.idx(), out = [];
+    ids.forEach(function (id) {
+      var g = I.ger[id]; if (!g || g.typ === 'messstelle') return;
+      var es = (I.ein[id] || []).slice().sort(function (a, b) { return a.von < b.von ? -1 : 1; });
+      var e = es.find(function (x) { return !x.bis; }) || es[es.length - 1];
+      if (e) out.push(e);
+    });
+    return out;
+  };
+  function hbPosInit(pid, n) {
+    return pid ? M.posBoxHtml('hb', pid, {}, n).replace('<option value="" selected>', '<option value="' + KEEP + '" selected>– unverändert –</option><option value="">') : '';
+  }
+  M.KEEP = KEEP;
+  /* Mehrfach-Historie: Auswahl «unverändert» stellt die Ausgangslage der Positionswahl wieder her */
+  M.hbPosReset = function () { var bx = $('hb-posbox'); if (bx && M.ctx && M.ctx.kind === 'histbulk') { bx.innerHTML = hbPosInit(M.ctx.hbProj, M.ctx.n); M.posSync('hb'); } };
+  M.openHistBulk = function (ids) {
+    var I = M.idx();
+    // Messstellen: ihre Geräte
+    var all = []; ids.forEach(function (id) { var g = I.ger[id]; if (g && g.typ === 'messstelle') all = all.concat(I.members[id] || []); else all.push(id); });
+    var es = M.histBulkPick(all);
+    if (!es.length) { M.toast('Die gewählten Geräte haben noch keine Einsätze.', 'err'); return; }
+    var projs = {}; es.forEach(function (e) { projs[e.ort === 'feld' ? (e.projektId || '-') : 'mag'] = 1; });
+    var oneProj = Object.keys(projs).length === 1 && es[0].ort === 'feld' && es[0].projektId ? es[0].projektId : '';
+    M.ctx = { kind: 'histbulk', eids: es.map(function (e) { return e.id; }), n: es.length, hbProj: oneProj };
+    var b = '<p><b>' + es.length + ' Geräte</b> – angepasst wird je Gerät der laufende Einsatz (sonst der letzte). <b>Leere Felder bleiben unverändert.</b></p>' +
+      '<div class="hb-list">' + es.map(function (e) {
+        var g = I.ger[e.geraetId];
+        return '<span>' + M.symbol(g.id, 18) + '<b>' + esc(g.name) + '</b> <span class="muted small">' + esc(M.ortText(e)) + (e.projektId && I.proj[e.projektId] ? ' · ' + esc(M.projName(I.proj[e.projektId])) : '') + ' · ' + M.fmtDate(e.von) + '–' + (e.bis ? M.fmtDate(e.bis) : 'laufend') + '</span></span>';
+      }).join('') + '</div>';
+    b += '<div class="grid2">' + fld('Von (Montage)', inp('hb-von', '', 'type="date"')) +
+      fld('Bis', '<select id="hb-bism" data-change="hb-bism">' + opt(KEEP, '– unverändert –', true) + opt('laufend', 'laufend (kein Ende)', false) + opt('datum', 'Datum …', false) + '</select>') +
+      '<span></span>' + '<div class="fld" id="hb-bisd" hidden><span>Bis-Datum</span>' + inp('hb-bis', '', 'type="date"') + '</div></div>';
+    b += '<div class="grid2">' + fld('Projekt (nur Einsätze im Feld)', '<select id="hb-proj" data-change="loc-proj" data-p="hb" data-prev="' + KEEP + '">' + opt(KEEP, '– unverändert –', true) + M.projOptions('', false) + '</select>') +
+      fld('Auftragsnummer / Teilprojekt', '<input id="hb-auftrag" list="auftrag-list" maxlength="40" placeholder="unverändert">' + M.auftragList()) + '</div>' +
+      '<div id="hb-posbox" class="posbox">' + hbPosInit(oneProj, es.length) + '</div>' +
+      '<div class="grid2">' + fld('Geplante Laufzeit, Monate ab «Von»', inp('hb-planm', '', 'type="number" min="1" max="120" placeholder="unverändert"')) + fld('oder geplant bis', inp('hb-pland', '', 'type="date"')) +
+      fld('Gesetzt von', inp('hb-ges', '', 'maxlength="40" placeholder="unverändert"')) + fld('Geholt von', inp('hb-geh', '', 'maxlength="40" placeholder="unverändert"')) + '</div>' +
+      fld('Bemerkung', inp('hb-bem', '', 'maxlength="200" placeholder="unverändert"'), 'full') +
+      '<p class="form-err" id="hb-err" role="alert"></p>';
+    M.modal({ title: 'Historie anpassen', form: 'histbulk', wide: true, body: b, foot: foot('Übernehmen') });
+  };
+  M.submitHistBulk = function () {
+    var I = M.idx(), c0 = M.ctx, ch = {};
+    var von = val('hb-von'); if (von) ch.von = von;
+    var bm = val('hb-bism'); if (bm === 'laufend') ch.bis = null; else if (bm === 'datum') { if (!val('hb-bis')) { $('hb-err').textContent = 'Bitte ein Bis-Datum wählen.'; return; } ch.bis = val('hb-bis'); }
+    var pj = val('hb-proj'); if (pj && pj !== KEEP && pj !== M.NEU_PROJ) ch.projektId = pj;
+    var au = val('hb-auftrag').trim(); if (au) ch.auftrag = au;
+    if ($('hb-pos') && val('hb-pos') !== KEEP) { var t = { projektId: ch.projektId || null }; readPos('hb', t); ch.positionId = t.positionId || null; ch.einheit = t.positionId ? t.einheit || null : null; }
+    else if (ch.projektId) { ch.positionId = null; ch.einheit = null; }
+    var pm = M.num(val('hb-planm')), pd = val('hb-pland');
+    if (pm) { ch.planMonate = pm; } else if (pd) { ch.planBis = pd; ch.planMonate = null; }
+    ['ges:gesetztVon', 'geh:geholtVon', 'bem:bemerkung'].forEach(function (x) { var k = x.split(':'); var v = val('hb-' + k[0]).trim(); if (v) ch[k[1]] = v; });
+    if (!Object.keys(ch).length) { $('hb-err').textContent = 'Nichts zu ändern – alle Felder sind leer.'; return; }
+    var jobs = [], skip = [], n = 0;
+    c0.eids.forEach(function (eid) {
+      var e = M.state.data.einsaetze.find(function (x) { return x.id === eid; }); if (!e) return;
+      var c = M.copy(e), g = I.ger[e.geraetId];
+      Object.keys(ch).forEach(function (k) {
+        if (e.ort !== 'feld' && ['projektId', 'auftrag', 'positionId', 'einheit', 'planMonate', 'planBis'].indexOf(k) >= 0) return;   // Magazin: nur Daten und Namen
+        c[k] = ch[k];
+      });
+      if (e.ort === 'feld') {
+        if (ch.planMonate) c.planBis = M.addMonths(c.von, ch.planMonate);
+        if ('positionId' in ch) { if (c.positionId) { c.amortModus = 'position'; c.amortBetrag = 0; } else if (e.amortModus === 'position') { c.amortModus = 'monat'; c.amortBetrag = 0; } }
+      }
+      if (c.bis && c.bis < c.von) { skip.push(g.name + ' («Bis» vor «Von»)'); return; }
+      var sh = M.shiftNeighbors(e, c);
+      if (sh.err) { skip.push(g.name + ' (' + sh.err + ')'); return; }
+      sh.puts.forEach(function (x) { jobs.push(M.put('einsaetze', x)); });
+      jobs.push(M.put('einsaetze', c)); n++;
+    });
+    Promise.all(jobs).then(function () {
+      M.closeModal(); M.state.invSel = {}; M.refreshUI();
+      M.toast('Historie angepasst: ' + n + (n === 1 ? ' Gerät' : ' Geräte'));
+      if (skip.length) M.toast('Nicht übernommen: ' + skip.join(', '), 'err');
+    });
+  };
+
   /* ================================================== RESERVIEREN (im Magazin, für ein Projekt vorgesehen) */
   M.openReserve = function (ids) {
     var I = M.idx();
@@ -628,17 +716,20 @@
     var b = mag.length === 1 ? '<div class="mv-from">' + M.symbol(mag[0].id, 32) + '<div><b>' + esc(mag[0].name) + '</b><span>' + esc(M.info(mag[0].id).ortText) + '</span></div></div>'
       : '<p><b>' + mag.length + ' Geräte</b> im Magazin reservieren.</p><div class="dup-names">' + mag.slice(0, 30).map(function (g) { return '<span>' + esc(g.name) + '</span>'; }).join('') + (mag.length > 30 ? '<span>… +' + (mag.length - 30) + '</span>' : '') + '</div>';
     if (andere.length) b += '<p class="hint small">' + andere.length + (andere.length === 1 ? ' Gerät ist' : ' Geräte sind') + ' nicht im Magazin und ' + (andere.length === 1 ? 'wird' : 'werden') + ' übersprungen: ' + esc(andere.slice(0, 6).map(function (g) { return g.name; }).join(', ')) + (andere.length > 6 ? ' …' : '') + '</p>';
+    M.ctx.n = mag.length;
     b += M.projSelHtml('rs', same ? first.projektId : '').replace('Projekt (optional)', 'Reserviert für Projekt') + M.newProjBox('rs') +
+      '<div id="rs-posbox" class="posbox">' + M.posBoxHtml('rs', same ? first.projektId : '', same ? { positionId: first.positionId, einheit: first.einheit } : {}, mag.length) + '</div>' +
       '<div class="grid2">' + fld('Montage geplant ab (optional)', inp('rs-ab', same ? first.ab || '' : '', 'type="date"')) +
       fld('Bemerkung (optional)', inp('rs-bem', same ? first.bemerkung || '' : '', 'maxlength="120" placeholder="z.B. für Etappe 2"')) + '</div>' +
-      '<p class="muted small">Die Geräte bleiben im Magazin und zählen nicht fürs Projekt (keine Amortisation, keine Abrechnung). Im Projekt erscheinen sie unter «Reserviert». Beim Platzieren ist das Projekt vorgewählt; mit dem Montieren endet die Reservation.</p>' +
+      '<p class="muted small">Die Geräte bleiben im Magazin und zählen nicht fürs Projekt (keine Amortisation, keine Abrechnung). Im Projekt erscheinen sie unter «Reserviert». Mit Offertposition und Set gehören sie schon zum Set: beim Montieren sind Projekt, Position und Set vorgewählt – jedes Gerät mit seinem eigenen Standort.</p>' +
       '<p class="form-err" id="rs-err" role="alert"></p>';
     M.modal({ title: 'Reservieren', form: 'reserve', body: b, foot: foot('Reservieren', first ? '<button type="button" class="btn ghost danger-t" data-act="res-clear">Reservation aufheben</button>' : '') });
   };
   M.submitReserve = function () {
     var pid = val('rs-proj');
     if (!pid || pid === M.NEU_PROJ) { $('rs-err').textContent = 'Bitte ein Projekt wählen.'; return; }
-    M.setReserve(M.ctx.ids, { projektId: pid, ab: val('rs-ab') || null, bemerkung: val('rs-bem') }).then(function (r) {
+    var t = { projektId: pid }; readPos('rs', t);
+    M.setReserve(M.ctx.ids, { projektId: pid, positionId: t.positionId || null, einheit: t.positionId ? t.einheit || null : null, ab: val('rs-ab') || null, bemerkung: val('rs-bem') }).then(function (r) {
       M.closeModal(); M.state.invSel = {}; M.refreshUI();
       M.toast(r.n + (r.n === 1 ? ' Gerät' : ' Geräte') + ' reserviert für ' + M.projName(M.idx().proj[pid]));
     });
@@ -656,7 +747,7 @@
     var info = one ? M.info(one.id) : null;
     // reservierte Geräte: das reservierte Projekt ist vorgewählt (bei mehreren nur, wenn alle dasselbe haben)
     var rs = gids.map(function (id) { return M.info(id).res; }), rs0 = rs[0];
-    var resInit = !onlyMag && rs0 && rs.every(function (r) { return r && r.projektId === rs0.projektId; }) ? { ort: 'feld', projektId: rs0.projektId } : null;
+    var resInit = !onlyMag && rs0 && rs.every(function (r) { return r && r.projektId === rs0.projektId; }) ? { ort: 'feld', projektId: rs0.projektId, positionId: rs.every(function (r) { return r.positionId === rs0.positionId && r.einheit === rs0.einheit; }) ? rs0.positionId : null, einheit: rs0.einheit } : null;
     var init = onlyMag ? { ort: 'magazin', magazinId: (M.magazine()[0] || {}).id } : resInit || (info && info.cur ? info.cur : { ort: 'feld' });
     var hasMcc = gids.some(function (id) { var g = I.ger[id]; return g && g.typ === 'tachymeter' && g.mccId; });
     var b = '';
@@ -757,7 +848,7 @@
       fld('Gerät', '<select id="pg-dev" data-change="pg-dev">' + group('Im Magazin', mag) + group('Im Feld', feld) + group('Ohne Standort', ohne) + '</select>') +
       '<div class="grid2">' + M.projSelHtml('pg', i.proj ? i.proj.id : i.res ? i.res.proj.id : '') +
       fld('Datum', inp('pg-date', M.today(), 'type="date" data-change="plan-in" data-p="pg"')) + '</div>' + M.newProjBox('pg') +
-      '<div id="pg-posbox" class="posbox">' + M.posBoxHtml('pg', i.proj ? i.proj.id : i.res ? i.res.proj.id : '', i.cur || {}, 1) + '</div>' +
+      '<div id="pg-posbox" class="posbox">' + M.posBoxHtml('pg', i.proj ? i.proj.id : i.res ? i.res.proj.id : '', i.res ? { positionId: i.res.positionId, einheit: i.res.einheit } : i.cur || {}, 1) + '</div>' +
       fld('Auftragsnummer / Teilprojekt (optional)', '<input id="pg-auftrag" list="auftrag-list" maxlength="40" placeholder="z.B. 26160-03" value="' + esc(i.cur && i.cur.auftrag || '') + '">' + M.auftragList()) +
       M.planBoxHtml('pg', {}) +
       amortFields('pg', { modus: la.modus, betrag: la.betrag }) +
@@ -1112,7 +1203,9 @@
       if (changed.indexOf('planMonate') >= 0 || changed.indexOf('von') >= 0) { if (c.planMonate) c.planBis = M.addMonths(c.von, c.planMonate); }
       if (c.ort !== 'feld') { c.lat = null; c.lng = null; c.ortName = ''; c.positionId = null; c.einheit = null; c.planBis = null; c.planMonate = null; }
       if (c.bis && c.bis < c.von) { skip.push(g.name + ' («Bis» vor «Von»)'); return; }
-      if (!c.bis && M.state.data.einsaetze.some(function (y) { return y.geraetId === c.geraetId && !y.bis && y.id !== c.id; })) { skip.push(g.name + ' (hat schon einen laufenden Einsatz)'); return; }
+      var sh = M.shiftNeighbors(x, c);
+      if (sh.err) { skip.push(g.name + ' (' + sh.err + ')'); return; }
+      sh.puts.forEach(function (y) { jobs.push(M.put('einsaetze', y)); });
       jobs.push(M.put('einsaetze', c)); n++;
     });
     return { jobs: jobs, skip: skip, n: n, changed: changed };
@@ -1139,9 +1232,9 @@
     e.bemerkung = $('e-bem').value.trim();
     if (!e.von) { $('e-err').textContent = 'Bitte ein Startdatum eingeben.'; return; }
     if (e.bis && e.bis < e.von) { $('e-err').textContent = '«Bis» liegt vor «Von».'; return; }
-    if (!e.bis && M.state.data.einsaetze.some(function (x) { return x.geraetId === e.geraetId && !x.bis && x.id !== e.id; })) {
-      $('e-err').textContent = 'Das Gerät hat schon einen laufenden Einsatz. Bitte ein «Bis»-Datum setzen.'; return;
-    }
+    var sh = M.shiftNeighbors(orig, e);
+    if (sh.err) { $('e-err').textContent = 'Geht so nicht: ' + sh.err + '. Bitte die Daten prüfen.'; return; }
+    sh.puts.forEach(function (x) { M.put('einsaetze', x); });
     var sibIds = $('e-set-on') && $('e-set-on').checked ? Array.prototype.map.call(document.querySelectorAll('.e-set-dev:checked'), function (el) { return el.value; }) : [];
     var origCopy = M.copy(orig);
     M.put('einsaetze', e).then(function () {
@@ -1310,6 +1403,7 @@
     else if (f === 'position') M.submitPosition();
     else if (f === 'laufzeit') M.submitLaufzeit();
     else if (f === 'reserve') M.submitReserve();
+    else if (f === 'histbulk') M.submitHistBulk();
     else if (f === 'msnew') M.submitMsNew();
     else if (f === 'msadd') M.submitMsAdd();
     else if (f === 'msedit') M.submitGruppeEdit();

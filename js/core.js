@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.6.5';
+  M.VERSION = '0.6.6';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -516,6 +516,9 @@
     var sameProj = cur && cur.ort === 'feld' && (cur.projektId || null) === target.projektId;
     target.positionId = feld && target.projektId ? (t.positionId !== undefined ? (t.positionId || null) : (sameProj ? cur.positionId || null : null)) : null;
     target.einheit = target.positionId ? (t.positionId !== undefined ? (t.einheit || null) : (sameProj ? cur.einheit || null : null)) : null;
+    // aus der Reservation (Magazin → Feld im reservierten Projekt): Offertposition und Set übernehmen, wenn nichts anderes angegeben
+    var rsv = cur && cur.ort === 'magazin' && cur.reserviert;
+    if (feld && rsv && rsv.projektId === target.projektId && t.positionId === undefined && rsv.positionId) { target.positionId = rsv.positionId; target.einheit = rsv.einheit || null; }
     // Tachymeter und seine MCC bilden zusammen eine Einheit
     if (target.positionId && !target.einheit && g.typ === 'tachymeter' && g.mccId) target.einheit = M.uid('set');
     // Geplante Laufzeit: angegeben (Monate ab Datum oder bis Datum), sonst bei gleichem Projekt die bisherige
@@ -676,6 +679,42 @@
 
   /* Reservieren: Geräte im Magazin einem Projekt zuteilen (r = { projektId, ab, bemerkung }) oder freigeben (r = null).
      Gespeichert am laufenden Magazin-Einsatz – kein neuer Eintrag in der Historie. Geräte einer Messstelle folgen. */
+  /* Historie korrigieren: verschiebt man «Von» bzw. «Bis» eines Einsatzes, rückt der direkt angrenzende
+     Einsatz (Ende = altes Von bzw. Beginn = altes Bis) mit, damit keine Lücke und keine Überschneidung entsteht.
+     Liefert { puts: [angepasste Nachbarn] } oder { err: 'Grund' }; prüft danach Überschneidungen. */
+  M.shiftNeighbors = function (orig, c) {
+    var out = [], es = M.state.data.einsaetze.filter(function (y) { return y.geraetId === c.geraetId && y.id !== c.id; });
+    if (c.von !== orig.von) {
+      var prev = es.find(function (y) { return y.bis === orig.von; });
+      if (prev) {
+        if (c.von <= prev.von) return { err: 'neues «Von» liegt vor dem Beginn des vorherigen Einsatzes (' + M.fmtDate(prev.von) + ')' };
+        var pc = M.copy(prev); pc.bis = c.von; out.push(pc);
+      }
+    }
+    if ((c.bis || null) !== (orig.bis || null) && orig.bis) {
+      var next = es.find(function (y) { return y.von === orig.bis; });
+      if (next) {
+        if (!c.bis) return { err: 'danach folgt ein weiterer Einsatz (' + M.fmtDate(next.von) + ')' };
+        if (next.bis && c.bis >= next.bis) return { err: 'neues «Bis» liegt nach dem Ende des folgenden Einsatzes' };
+        var nc = M.copy(next); nc.von = c.bis; out.push(nc);
+      }
+    }
+    var moved = {}; out.forEach(function (x) { moved[x.id] = x; });
+    var hit = es.map(function (y) { return moved[y.id] || y; }).find(function (y) { return y.von < (c.bis || '9999') && (y.bis || '9999') > c.von; });
+    if (hit) return { err: 'überschneidet ' + M.fmtDate(hit.von) + '–' + (hit.bis ? M.fmtDate(hit.bis) : 'laufend') };
+    if (!c.bis && es.some(function (y) { return !(moved[y.id] || y).bis; })) return { err: 'hat schon einen laufenden Einsatz' };
+    return { puts: out };
+  };
+
+  /* Reservierte Sets einer Offertposition: { einheit: Anzahl Geräte im Magazin } */
+  M.resSets = function (posId) {
+    var o = {};
+    M.state.data.einsaetze.forEach(function (e) { if (!e.bis && e.ort === 'magazin' && e.reserviert && e.reserviert.positionId === posId && e.reserviert.einheit) o[e.reserviert.einheit] = (o[e.reserviert.einheit] || 0) + 1; });
+    return o;
+  };
+  M.resCount = function (posId) {
+    return M.state.data.einsaetze.filter(function (e) { return !e.bis && e.ort === 'magazin' && e.reserviert && e.reserviert.positionId === posId; }).length;
+  };
   M.setReserve = function (ids, r) {
     var I = M.idx(), jobs = [], n = 0, skip = [], done = {}, wer = M.userKuerzel();
     function one(id) {
@@ -685,7 +724,7 @@
       if (g.typ === 'messstelle') (I.members[id] || []).forEach(one);
       if (!cur || cur.ort !== 'magazin') { if (g.typ !== 'messstelle') skip.push(g.name); return; }
       var c = M.copy(cur);
-      if (r && r.projektId) c.reserviert = { projektId: r.projektId, ab: r.ab || null, bemerkung: r.bemerkung || '', wer: wer, datum: M.today() };
+      if (r && r.projektId) c.reserviert = { projektId: r.projektId, positionId: r.positionId || null, einheit: r.einheit || null, ab: r.ab || null, bemerkung: r.bemerkung || '', wer: wer, datum: M.today() };
       else { if (!cur.reserviert) return; delete c.reserviert; }
       jobs.push(M.put('einsaetze', c)); if (g.typ !== 'messstelle') n++;
     }

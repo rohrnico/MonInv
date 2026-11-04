@@ -449,6 +449,7 @@
     'plan-mode': function (d) { M.planSetMode(d.p, d.k); },
     'bulk-plan': function () { M.openLaufzeit(selectedIds()); },
     'bulk-res': function () { M.openReserve(selectedIds()); },
+    'bulk-hist': function () { M.openHistBulk(selectedIds()); },
     'reserve': function (d) { M.openReserve([d.id]); },
     'res-clear': function () { M.clearReserve(); },
     'laufzeit': function (d) { M.openLaufzeit([d.id]); },
@@ -668,6 +669,7 @@
     'plan-in': function (d) { M.planInfoUpdate(d.p); },
     'loc-proj': function (d, el) {
       if (el.value === M.NEU_PROJ) { M.newProjShow(d.p, true); return; }
+      if (el.value === M.KEEP) { el.setAttribute('data-prev', el.value); M.newProjShow(d.p, false); M.hbPosReset(); return; }
       el.setAttribute('data-prev', el.value); M.newProjShow(d.p, false);
       var p = d.p, bx = $(p + '-posbox'); if (!bx) return;
       bx.innerHTML = M.posBoxHtml(p, el.value, {}, (M.ctx && M.ctx.n) || 1); M.posSync(p);
@@ -675,8 +677,10 @@
     },
     'loc-pos': function (d, el) {
       if (el.value === M.NEU_PROJ) { M.newPosShow(d.p, true); return; }
+      if (el.value === M.KEEP) { M.hbPosReset(); return; }
       var p = d.p, bx = $(p + '-posbox'); if (!bx) return;
-      bx.innerHTML = M.posBoxHtml(p, $(p + '-proj').value, { positionId: el.value }, (M.ctx && M.ctx.n) || 1); M.posSync(p);
+      var pj = $(p + '-proj').value; if (pj === M.KEEP && M.ctx) pj = M.ctx.hbProj;
+      bx.innerHTML = M.posBoxHtml(p, pj, { positionId: el.value }, (M.ctx && M.ctx.n) || 1); M.posSync(p);
       var s = $(p + '-pos'); if (s) s.focus();
       if (M.ctx && M.ctx.kind === 'move') M.movePreview();
     },
@@ -705,6 +709,7 @@
       if (d.k === 'projekt' && el.value) setTimeout(M.mapFitAll, 50);
     },
     'invf': function (d, el) { M.state.filters.inv[d.k] = el.value; M.renderInventar(); },
+    'hb-bism': function (d, el) { var x = $('hb-bisd'); if (x) x.hidden = el.value !== 'datum'; },
     'e-set-on': function (d, el) { var b = $('e-set-devs'); if (b) b.classList.toggle('off', !el.checked); },
     'user-role': function (d, el) { M.setRolle(d.mail, el.value).then(function () { M.toast(d.mail + ' ist jetzt ' + M.ROLLEN[el.value].name); }); },
     'inv-sel': function (d, el) { M.state.invSel[d.id] = el.checked; M.renderInventar(); },

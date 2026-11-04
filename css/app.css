@@ -1073,3 +1073,9 @@ form .posbox:not(:empty) { margin-top: 14px; }
 .pi-r { margin-right: 6px; padding: 0 6px; border: 1.5px dashed var(--blau); border-radius: 9px; color: var(--blau); font: 700 11px/16px var(--f-head); }
 .res-chip { border-style: dashed; border-color: #8FB0D6; background: var(--himmel-2); }
 .res-chip .small { margin-left: 2px; }
+
+/* Historie mehrerer Geräte */
+.hb-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 4px 14px; max-height: 190px; overflow-y: auto; border: 1px solid var(--linie); padding: 8px 10px; margin-bottom: 12px; }
+.hb-list > span { display: flex; align-items: center; gap: 6px; font-size: 13px; min-width: 0; }
+.hb-list b { white-space: nowrap; }
+.hb-list .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
