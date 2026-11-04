@@ -7,7 +7,7 @@
    (Anleitung in ANLEITUNG.md) und hier eintragen:                                  */
 
 window.MONINV_CONFIG = {
-  modus: 'lokal',
+  modus: 'sharepoint',
   qrAdresse: 'https://rohrnico.github.io/MonInv/',
   sharepoint: {
     tenantId: '021f91fa-e689-4c95-8480-d96da66cc2e1',
