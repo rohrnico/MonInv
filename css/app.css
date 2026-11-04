@@ -1132,3 +1132,10 @@ form .posbox:not(:empty) { margin-top: 14px; }
   .mb-out, .dw-out { display: none; }
   .btn:hover, .tool:hover, .dev-chip:hover { transform: none !important; }
 }
+
+/* Datei fehlt in SharePoint */
+.ft.missing { border-color: var(--signal); }
+.ft.missing .ft-th { opacity: .45; }
+.ft-miss { position: relative; overflow: hidden; display: block; margin: 0 10px 8px; padding: 6px 8px; background: var(--signal-bg); color: var(--signal-t); font: 600 12px var(--f-body); cursor: pointer; border-radius: 2px; }
+.ft-miss input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.vw-none .file-in { margin-top: 10px; }

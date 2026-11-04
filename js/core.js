@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.6.12';
+  M.VERSION = '0.6.13';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -1179,7 +1179,7 @@
         if (file.size > M.MAX_DATEI) { M.toast(file.name + ': grösser als 50 MB, nicht hochgeladen', 'err'); return null; }
         var id = M.uid('dat');
         return thumbOf(file).then(function (thumb) {
-          return M.store.putBlob(id, file.name, file).then(function (ref) {
+          return M.store.putBlob(id, file.name, file, M.fileFolder(ziel, zielId)).then(function (ref) {
             var rec = { id: id, ziel: ziel, zielId: zielId, name: file.name, mime: file.type || '', groesse: file.size, art: art || (M.isPdf({ name: file.name, mime: file.type }) ? (ziel === 'projekt' ? (M.can('fin') ? 'offerte' : 'plan') : 'plan') : (ziel === 'projekt' ? 'andere' : 'foto')),
               datum: M.today(), wer: M.userKuerzel(), ref: ref, thumb: thumb || null, bemerkung: '' };
             ok.push(rec);
@@ -1188,6 +1188,25 @@
         }).then(function () { done++; if (onStep) onStep(done, list.length); });
       });
     }, Promise.resolve()).then(function () { return ok; });
+  };
+  /* Unterordner in SharePoint: Projekte/<Nr Name> bzw. Geräte/<Name> */
+  M.fileFolder = function (ziel, zielId) {
+    var I = M.idx();
+    if (ziel === 'projekt') { var p = I.proj[zielId]; return ['Projekte', p ? M.projName(p) : zielId]; }
+    var g = I.ger[zielId]; return ['Geräte', g ? g.name : zielId];
+  };
+  /* Datei fehlt im Speicher (z.B. im Testbetrieb hochgeladen)? */
+  M.fileMissing = function (f) { return M.store && M.store.mode === 'sharepoint' && !(f.ref && f.ref.itemId); };
+  /* Fehlende Datei neu hochladen: gleicher Eintrag, neue Ablage */
+  M.reuploadFile = function (fid, file) {
+    var f = (M.state.data.dateien || []).find(function (x) { return x.id === fid; });
+    if (!f || !file) return Promise.resolve();
+    return thumbOf(file).then(function (thumb) {
+      return M.store.putBlob(f.id, file.name, file, M.fileFolder(f.ziel, f.zielId)).then(function (ref) {
+        var c = M.copy(f); c.ref = ref; c.name = file.name; c.mime = file.type || c.mime; c.groesse = file.size; if (thumb) c.thumb = thumb; c.datum = M.today(); c.wer = M.userKuerzel();
+        return M.put('dateien', c);
+      });
+    });
   };
   M.fileBlob = function (fid) {
     var f = (M.state.data.dateien || []).find(function (x) { return x.id === fid; });

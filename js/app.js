@@ -143,7 +143,9 @@
       var img = b.querySelector('.vw-img');
       if (img) img.addEventListener('click', function () { img.classList.toggle('zoom'); });
     }).catch(function (e) {
-      var b = v.querySelector('.vw-b'); if (b) b.innerHTML = '<div class="vw-none"><p>' + M.esc(e.message || String(e)) + '</p></div>';
+      var b = v.querySelector('.vw-b'); if (!b) return;
+      b.innerHTML = '<div class="vw-none"><p>' + M.esc(e.message || String(e)) + '</p>' +
+        (e.fehlt && M.can('edit') ? '<label class="btn file-in">Neu hochladen<input type="file" data-change="file-reup" data-id="' + M.esc(fid) + '"></label>' : '') + '</div>';
     });
   };
   M.closeViewer = function () {
@@ -551,6 +553,11 @@
       M.setRolle(mail, r).then(function () { M.toast(mail + ' ist jetzt ' + M.ROLLEN[r].name); });
     },
     'date-clear': function (d, el) { M.dateClear(el); },
+    'sp-folder': function () {
+      if (!M.store.folderUrl) return;
+      var w = window.open('', '_blank');
+      M.store.folderUrl().then(function (u) { if (w) w.location = u; else location.href = u; }).catch(function (e) { if (w) w.close(); M.toast('Ordner nicht gefunden: ' + (e.message || e), 'err'); });
+    },
     'check-open': function () {
       M.state.drawer = null; M.go('einstellungen');
       setTimeout(function () { var s = $('sec-check'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
@@ -709,6 +716,11 @@
     'invf': function (d, el) { M.state.filters.inv[d.k] = el.value; M.renderInventar(); },
     'hb-bism': function (d, el) { var x = $('hb-bisd'); if (x) x.hidden = el.value !== 'datum'; },
     'e-set-on': function (d, el) { var b = $('e-set-devs'); if (b) b.classList.toggle('off', !el.checked); },
+    'file-reup': function (d, el) {
+      var file = el.files && el.files[0]; if (!file) return;
+      M.toast('Datei wird hochgeladen …');
+      M.reuploadFile(d.id, file).then(function () { M.toast('Datei neu hochgeladen'); M.refreshUI(); }).catch(function (e) { M.toast('Hochladen fehlgeschlagen: ' + (e.message || e), 'err'); });
+    },
     'user-role': function (d, el) { M.setRolle(d.mail, el.value).then(function () { M.toast(d.mail + ' ist jetzt ' + M.ROLLEN[el.value].name); }); },
     'inv-sel': function (d, el) { M.state.invSel[d.id] = el.checked; M.renderInventar(); },
     'inv-all': function (d, el) { (M.state.invVisible || []).forEach(function (id) { M.state.invSel[id] = el.checked; }); M.renderInventar(); },

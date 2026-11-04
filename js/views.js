@@ -794,7 +794,8 @@
         '<label class="fld inline"><span>Mein Kürzel (für «gesetzt / geholt von»)</span><input id="set-kuerzel" maxlength="12" value="' + esc(st.kuerzel || '') + '" data-change="set-kuerzel"></label>';
     } else {
       h += '<p class="muted">Angemeldet als <b>' + esc(store.userName || '–') + '</b>' + (M.userEmail() ? ' (' + esc(M.userEmail()) + ')' : '') + ' · Rolle <b>' + esc(M.ROLLEN[M.realRole()].name) + '</b>. Die App aktualisiert sich jede Minute und beim Zurückkehren in den Tab.</p>' +
-        '<button type="button" class="btn ghost sm" data-act="refresh">Jetzt aktualisieren</button> <button type="button" class="btn ghost sm" data-act="logout">Abmelden</button>';
+        '<button type="button" class="btn ghost sm" data-act="refresh">Jetzt aktualisieren</button> <button type="button" class="btn ghost sm" data-act="sp-folder">Dateien in SharePoint öffnen</button> <button type="button" class="btn ghost sm" data-act="logout">Abmelden</button>' +
+        '<p class="muted small">Pläne, Offerten und Fotos liegen in der Dokumentbibliothek der Website im Ordner «MonInv-Dateien», sortiert nach «Projekte» und «Geräte».</p>';
     }
     h += '</section>';
     if (M.realRole() === 'admin') h += rollenHtml();
@@ -854,7 +855,12 @@
     var r = M.datenCheck(), I = M.idx();
     var h = '<section class="card" id="sec-check"><div class="card-h"><h2>Datenprüfung</h2><span class="grow"></span>' +
       (r.n ? '<button type="button" class="btn sm" data-act="check-fix">Bereinigen (' + r.n + ')</button>' : '') + '</div>';
-    if (!r.n && !r.namen.length) return h + '<p class="ok-t"><b>Alles in Ordnung.</b> Keine Geräte mit sich überschneidenden Einsätzen, keine doppelten Gerätenamen.</p></section>';
+    var miss = (M.state.data.dateien || []).filter(M.fileMissing);
+    if (miss.length) {
+      h += '<p class="small"><b>' + miss.length + (miss.length === 1 ? ' Datei fehlt' : ' Dateien fehlen') + ' in SharePoint.</b> ' + (miss.length === 1 ? 'Sie wurde im Testbetrieb hochgeladen und liegt' : 'Sie wurden im Testbetrieb hochgeladen und liegen') + ' nur im damaligen Browser (die Sicherung enthält keine Dateien). Beim Gerät bzw. Projekt unter «Pläne & Dateien» mit «Neu hochladen» ersetzen:</p><div class="ck-list">' +
+        miss.slice(0, 40).map(function (f) { var z = f.ziel === 'projekt' ? I.proj[f.zielId] : I.ger[f.zielId]; return '<div class="ck-row"><b>' + esc(f.name) + '</b><div class="ck-d"><span>' + (f.ziel === 'projekt' ? 'Projekt ' + esc(z ? M.projName(z) : '?') : (z ? '<button type="button" class="link-btn" data-act="open" data-id="' + z.id + '">' + esc(z.name) + '</button>' : '?')) + '</span></div></div>'; }).join('') + '</div>';
+    }
+    if (!r.n && !r.namen.length && !miss.length) return h + '<p class="ok-t"><b>Alles in Ordnung.</b> Keine Geräte mit sich überschneidenden Einsätzen, keine doppelten Gerätenamen.</p></section>';
     if (r.n) {
       h += '<p class="small">' + r.n + (r.n === 1 ? ' Gerät hat' : ' Geräte haben') + ' Einsätze, die sich zeitlich überschneiden (z.B. zweimal laufend). Sie erscheinen in Projekten doppelt und können doppelt abgerechnet werden. ' +
         '«Bereinigen» führt exakte Doppel zusammen und beendet sonst den früheren Einsatz am Beginn des nächsten.</p><div class="ck-list">';
@@ -942,8 +948,10 @@
   function fileGroup(label, files, ziel) {
     var h = '<div class="fg"><div class="fg-h">' + esc(label) + ' <span class="muted">' + files.length + '</span></div><div class="fgrid">';
     files.forEach(function (f) {
-      h += '<div class="ft"><button type="button" class="ft-open" data-act="file-open" data-id="' + f.id + '" title="' + esc(f.name) + ' öffnen"><span class="ft-th">' + fileIcon(f) + '</span>' +
+      var miss = M.fileMissing(f);
+      h += '<div class="ft' + (miss ? ' missing' : '') + '"><button type="button" class="ft-open" data-act="file-open" data-id="' + f.id + '" title="' + esc(f.name) + ' öffnen"><span class="ft-th">' + fileIcon(f) + '</span>' +
         '<span class="ft-n">' + esc(f.name) + '</span><span class="ft-m">' + M.fmtDate(f.datum) + ' · ' + M.fmtSize(f.groesse) + (f.wer ? ' · ' + esc(f.wer) : '') + '</span></button>' +
+        (miss ? '<label class="ft-miss"><span>Fehlt in SharePoint – neu hochladen</span><input type="file" data-change="file-reup" data-id="' + f.id + '"></label>' : '') +
         '<span class="ft-a"><select data-change="file-art" data-id="' + f.id + '" aria-label="Art von ' + esc(f.name) + '">' + M.dateiArten(ziel).map(function (a) { return opt(a[0], a[1], a[0] === f.art); }).join('') + '</select>' +
         '<button type="button" class="ic-btn" data-act="file-del" data-id="' + f.id + '" aria-label="' + esc(f.name) + ' löschen" title="Löschen">×</button></span></div>';
     });

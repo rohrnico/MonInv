@@ -128,10 +128,13 @@
     if (this.driveId) return Promise.resolve(this.driveId);
     return this._graph('GET', '/sites/' + this.siteId + '/drive?$select=id').then(function (d) { self.driveId = d.id; return d.id; });
   };
-  SharePointStore.prototype.putBlob = function (id, name, blob) {
+  /* Dateien liegen in der Dokumentbibliothek der Website: MonInv-Dateien/Projekte/<Projekt>/… bzw. …/Geräte/<Gerät>/… */
+  function clean(s) { return String(s || '').replace(/[\\/:*?"<>|#%~&{}]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Ohne Namen'; }
+  SharePointStore.prototype.putBlob = function (id, name, blob, sub) {
     var self = this, folder = this.cfg.dateienOrdner || 'MonInv-Dateien';
-    var safe = String(name || 'datei').replace(/[\\/:*?"<>|#%]+/g, '_').slice(-120);
-    var path = encodeURIComponent(folder) + '/' + encodeURIComponent(id + '-' + safe);
+    var safe = clean(name).slice(-120);
+    var parts = [folder].concat((sub || []).map(clean)).concat([safe.replace(/(\.[^.]+)?$/, function (ext) { return ' (' + id.slice(-6) + ')' + ext; })]);
+    var path = parts.map(encodeURIComponent).join('/');
     return this._drive().then(function (drive) {
       if (blob.size <= 4 * 1024 * 1024) {
         return self._raw('PUT', '/drives/' + drive + '/root:/' + path + ':/content', blob, { 'Content-Type': blob.type || 'application/octet-stream' }).then(function (r) { return r.json(); });
@@ -149,19 +152,27 @@
         }
         return part(0);
       });
-    }).then(function (item) { return { itemId: item.id, webUrl: item.webUrl }; });
+    }).then(function (item) { return { itemId: item.id, webUrl: item.webUrl, path: parts.join('/') }; });
   };
   SharePointStore.prototype.getBlob = function (ref) {
     var self = this;
+    if (!ref || !ref.itemId) return Promise.reject(Object.assign(new Error('Diese Datei wurde im Testbetrieb hochgeladen und liegt nur im damaligen Browser – in SharePoint gibt es nur den Eintrag. Bitte die Datei neu hochladen (Knopf «Neu hochladen»).'), { fehlt: true }));
     return this._drive().then(function (drive) {
       return self._graph('GET', '/drives/' + drive + '/items/' + ref.itemId + '?$select=id,@microsoft.graph.downloadUrl');
     }).then(function (it) {
       var u = it && it['@microsoft.graph.downloadUrl'];
-      if (!u) throw new Error('Datei in SharePoint nicht gefunden.');
+      if (!u) throw Object.assign(new Error('Datei in SharePoint nicht gefunden.'), { fehlt: true });
       return fetch(u).then(function (r) { if (!r.ok) throw new Error('Download: HTTP ' + r.status); return r.blob(); });
     });
   };
+  SharePointStore.prototype.folderUrl = function () {
+    var self = this, folder = this.cfg.dateienOrdner || 'MonInv-Dateien';
+    return this._drive().then(function (drive) {
+      return self._graph('GET', '/drives/' + drive + '/root:/' + encodeURIComponent(folder) + '?$select=webUrl').catch(function () { return self._graph('GET', '/drives/' + drive + '/root?$select=webUrl'); });
+    }).then(function (it) { return it.webUrl; });
+  };
   SharePointStore.prototype.removeBlob = function (ref) {
+    if (!ref || !ref.itemId) return Promise.resolve();
     var self = this;
     return this._drive().then(function (drive) { return self._raw('DELETE', '/drives/' + drive + '/items/' + ref.itemId); }).catch(function (e) { if (e.status !== 404) throw e; });
   };
