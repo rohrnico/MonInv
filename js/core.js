@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.5.7';
+  M.VERSION = '0.5.8';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -95,6 +95,7 @@
     drawing: null,       // { kabelId, pts:[[lat,lng]], vonId, zuId }
     projSel: null,
     invSel: {},
+    roleTest: (function () { try { return sessionStorage.getItem('moninv-roletest') || null; } catch (e) { return null; } })(),   // Admin: Ansicht als …
     filters: {
       map: { off: {}, feld: true, magazin: true, issue: false, projekt: '', kabel: true },
       inv: { q: '', typ: '', gruppe: '', ort: '', projekt: '', zustand: '' },
@@ -405,10 +406,69 @@
     return (M.store && M.store.userName) || s.kuerzel || '';
   };
 
+  /* ---------- Rollen: Admin (alles), User (ohne Finanzen), Sekretariat (Finanzen sehen, nichts ändern)
+     Admins stehen fest in config.js (admins: […]); weitere Rollen trägt ein Admin unter Einstellungen › Benutzer ein.
+     Wer nicht eingetragen ist, gilt als User. Im lokalen Testbetrieb ist man Admin. */
+  M.ROLLEN = {
+    admin: { name: 'Admin', text: 'alles, inkl. Benutzer und Rollen' },
+    user: { name: 'User', text: 'alles ausser Finanzen (Werte, Amortisation, Offerte, Abrechnung, Kosten)' },
+    sekretariat: { name: 'Sekretariat', text: 'alles sehen inkl. Finanzen, aber nichts ändern' }
+  };
+  M.ROLLEN_ORDER = ['admin', 'user', 'sekretariat'];
+  function lc(x) { return String(x || '').trim().toLowerCase(); }
+  M.userEmail = function () { return lc(M.store && M.store.userEmail); };
+  M.cfgAdmins = function () { var c = window.MONINV_CONFIG || {}; return (Array.isArray(c.admins) ? c.admins : []).map(lc).filter(Boolean); };
+  M.realRole = function () {
+    if (!M.store || M.store.mode !== 'sharepoint') return 'admin';
+    var mail = M.userEmail(), admins = M.cfgAdmins(), rollen = M.settings().rollen || {};
+    if (mail && admins.indexOf(mail) >= 0) return 'admin';
+    var r = rollen[mail];
+    if (r && M.ROLLEN[r]) return r;
+    // Übergang: solange niemand als Admin bestimmt ist, sind alle Admin (sonst könnte sich niemand einrichten)
+    if (!admins.length && !Object.keys(rollen).some(function (k) { return rollen[k] === 'admin'; })) return 'admin';
+    return 'user';
+  };
+  /* Admins können die App als User oder Sekretariat ansehen (nur in diesem Tab, zum Prüfen) */
+  M.role = function () {
+    var real = M.realRole(), t = M.state.roleTest;
+    return real === 'admin' && t && M.ROLLEN[t] ? t : real;
+  };
+  M.can = function (what) {
+    var r = M.role();
+    if (what === 'fin') return r !== 'user';
+    if (what === 'edit') return r !== 'sekretariat';
+    if (what === 'admin') return r === 'admin';
+    return true;
+  };
+  /* Rolle einer Person setzen (null = Eintrag entfernen). Nur Admin. */
+  M.setRolle = function (mail, rolle) {
+    if (M.realRole() !== 'admin') { M.toast('Nur Admins können Rollen vergeben.', 'err'); return Promise.resolve(); }
+    var s = M.copy(M.settings()), r = Object.assign({}, s.rollen || {});
+    mail = lc(mail);
+    if (rolle && M.ROLLEN[rolle]) r[mail] = rolle; else delete r[mail];
+    s.rollen = r;
+    var me = M.userEmail();
+    // sich selbst nicht aussperren: der letzte Admin (ohne Eintrag in config.js) bleibt Admin
+    if (me === mail && rolle !== 'admin' && M.cfgAdmins().indexOf(me) < 0 && M.store.mode === 'sharepoint') {
+      M.toast('Die eigene Admin-Rolle kann man nicht selbst entfernen.', 'err'); return Promise.resolve();
+    }
+    return M.put('einstellungen', s).then(function () { M.refreshUI(); });
+  };
+  M.denied = function () { M.toast('Nur lesen: Als ' + M.ROLLEN[M.role()].name + ' können Sie nichts ändern.', 'err'); };
+
   /* ---------- Daten ändern */
   M.bump = function () { M.state.version++; };
 
   M.put = function (col, rec) {
+    // Nur lesen: nichts speichern. Ohne Meldung, weil auch Hintergrund-Ergänzungen (z.B. Ortsname) hier landen;
+    // Klicks auf Bearbeiten-Aktionen meldet schon der Wächter in app.js.
+    if (!M.can('edit')) { console.info('MonInv: nur lesen, nicht gespeichert', col, rec && rec.id); return Promise.resolve(); }
+    // Rollen ändert nur ein Admin – andere behalten beim Speichern der Einstellungen die bestehende Liste
+    if (col === 'einstellungen' && rec && rec.id === 'global' && M.realRole() !== 'admin') {
+      var cur = (M.state.data.einstellungen || []).find(function (r) { return r.id === 'global'; });
+      rec = Object.assign({}, rec, { rollen: cur && cur.rollen ? cur.rollen : rec.rollen });
+      if (!cur || !cur.rollen) delete rec.rollen;
+    }
     var arr = M.state.data[col];
     var i = arr.findIndex(function (r) { return r.id === rec.id; });
     if (i >= 0) arr[i] = rec; else arr.push(rec);
@@ -416,6 +476,7 @@
     return M.store.save(col, rec).catch(M.failed);
   };
   M.del = function (col, id) {
+    if (!M.can('edit')) { console.info('MonInv: nur lesen, nicht gelöscht', col, id); return Promise.resolve(); }
     M.state.data[col] = M.state.data[col].filter(function (r) { return r.id !== id; });
     M.bump();
     return M.store.remove(col, id).catch(M.failed);
@@ -927,6 +988,10 @@
     geraet: [['plan', 'Messplan'], ['fixpunkt', 'Fixpunktplan'], ['skizze', 'Skizze'], ['foto', 'Foto'], ['zertifikat', 'Kalibrierung / Zertifikat'], ['andere', 'Anderes']],
     projekt: [['offerte', 'Offerte'], ['plan', 'Plan'], ['vertrag', 'Auftrag / Vertrag'], ['bericht', 'Bericht'], ['andere', 'Anderes']]
   };
+  /* Offerte und Vertrag gehören zum Finanzbereich */
+  M.FIN_ARTEN = { offerte: 1, vertrag: 1 };
+  M.dateiArten = function (ziel) { return (M.DATEI_ARTEN[ziel] || []).filter(function (a) { return M.can('fin') || !M.FIN_ARTEN[a[0]]; }); };
+  M.fileVisible = function (f) { return M.can('fin') || f.ziel !== 'projekt' || !M.FIN_ARTEN[f.art]; };
   M.dateiArtLabel = function (ziel, art) { var a = (M.DATEI_ARTEN[ziel] || []).find(function (x) { return x[0] === art; }); return a ? a[1] : 'Datei'; };
   M.MAX_DATEI = 50 * 1024 * 1024;
   M.isBild = function (f) { return /^image\//.test(f.mime || '') || /\.(jpe?g|png|gif|webp)$/i.test(f.name || ''); };
@@ -954,7 +1019,7 @@
         var id = M.uid('dat');
         return thumbOf(file).then(function (thumb) {
           return M.store.putBlob(id, file.name, file).then(function (ref) {
-            var rec = { id: id, ziel: ziel, zielId: zielId, name: file.name, mime: file.type || '', groesse: file.size, art: art || (M.isPdf({ name: file.name, mime: file.type }) ? (ziel === 'projekt' ? 'offerte' : 'plan') : (ziel === 'projekt' ? 'andere' : 'foto')),
+            var rec = { id: id, ziel: ziel, zielId: zielId, name: file.name, mime: file.type || '', groesse: file.size, art: art || (M.isPdf({ name: file.name, mime: file.type }) ? (ziel === 'projekt' ? (M.can('fin') ? 'offerte' : 'plan') : 'plan') : (ziel === 'projekt' ? 'andere' : 'foto')),
               datum: M.today(), wer: M.userKuerzel(), ref: ref, thumb: thumb || null, bemerkung: '' };
             ok.push(rec);
             return M.put('dateien', rec);

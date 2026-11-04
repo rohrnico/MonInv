@@ -182,9 +182,10 @@
       set('seriennummer', sn, 'Seriennummer');
       var kd = pd(cell(r, 'kauf'));
       if (kd === 'x') it.errs.push('Kaufdatum unlesbar'); else set('kaufdatum', kd, 'Kaufdatum');
-      var w = cell(r, 'wert'); if (w) { if (M.num(w) === null) it.errs.push('Wert unlesbar'); else set('wert', M.num(w), 'Anschaffungswert'); }
-      var v = cell(r, 'vor'); if (v) { if (M.num(v) === null) it.errs.push('Startwert unlesbar'); else if (M.num(v) !== (M.num(rec.amortVor) || 0)) set('amortVor', M.num(v), 'Startwert'); }
-      var vd = pd(cell(r, 'vorDat')); if (vd === 'x') it.errs.push('«Stand per» unlesbar'); else set('amortVorDatum', vd, 'Stand per');
+      var fin = M.can('fin');   // User: Finanzspalten der CSV werden ignoriert
+      var w = fin && cell(r, 'wert'); if (w) { if (M.num(w) === null) it.errs.push('Wert unlesbar'); else set('wert', M.num(w), 'Anschaffungswert'); }
+      var v = fin && cell(r, 'vor'); if (v) { if (M.num(v) === null) it.errs.push('Startwert unlesbar'); else if (M.num(v) !== (M.num(rec.amortVor) || 0)) set('amortVor', M.num(v), 'Startwert'); }
+      var vd = fin ? pd(cell(r, 'vorDat')) : ''; if (vd === 'x') it.errs.push('«Stand per» unlesbar'); else set('amortVorDatum', vd, 'Stand per');
       var sim = cell(r, 'sim');
       if (/^\d+([.,]\d+)?e\+?\d+$/i.test(sim)) it.notes.push('SIM-Nummer von Excel verkürzt (' + sim + ') – nicht übernommen');
       else if (sim && norm(sim) !== 'keine') set('sim', sim.replace(/\s+/g, ' '), 'SIM');
@@ -215,7 +216,7 @@
       var ortT = cell(r, 'ort'), projT = cell(r, 'proj'), pos = M.parseLv95(cell(r, 'ost'), cell(r, 'nord'));
       if ((cell(r, 'ost') || cell(r, 'nord')) && !pos) it.notes.push('LV95 ungültig – ohne Position');
       var seit = pd(cell(r, 'seit')); if (seit === 'x') { it.errs.push('«Seit» unlesbar'); seit = null; }
-      var am = parseAmort(cell(r, 'amortText'));
+      var am = M.can('fin') ? parseAmort(cell(r, 'amortText')) : null;
       var t = null;
       if (/^bei\s+/i.test(ortT) && rec.typ === 'mcc') { if (!it.link) it.link = ortT.replace(/^bei\s+/i, ''); }
       else if (ortT && magByName[norm(ortT)]) t = { ort: 'magazin', magazinId: magByName[norm(ortT)].id };

@@ -86,6 +86,20 @@ Im SharePoint-Modus ist MonInv passwortgeschützt: Beim Öffnen meldet man sich 
 
 Der lokale Testmodus hat keine Anmeldung; die Daten liegen dort nur im eigenen Browser.
 
+### Rollen
+
+| Rolle | Darf |
+|---|---|
+| **Admin** | alles, inkl. Benutzer und Rollen, Sicherung exportieren/importieren |
+| **User** | alles ausser Finanzen: keine Anschaffungswerte, Restwerte, Amortisation, Offertpositionen, Abrechnung, Wartungskosten, Offerte- und Vertragsdokumente. Exporte ohne Finanzspalten; beim CSV-Import werden Finanzspalten ignoriert. |
+| **Sekretariat** | alles sehen inkl. Finanzen (Abrechnung, PDF, Excel), aber nichts ändern |
+
+- **Admins** stehen fest in `config.js` (`admins: ['n.rohr@ristag.ch']`) – so kann sich niemand aussperren.
+- Weitere Personen trägt ein Admin unter **Einstellungen › Benutzer und Rollen** ein (E-Mail des Microsoft-Kontos + Rolle). Wer nicht eingetragen ist, ist **User**.
+- **Ansicht testen** (ebenda): Admins sehen die App als User oder Sekretariat; oben steht dann «Ansicht als …» mit «Zurück zu Admin». Gilt nur im aktuellen Tab.
+- **Schutz:** Die App blendet die Finanzbereiche für User aus und sperrt fürs Sekretariat jedes Ändern. Wer die SharePoint-Listen direkt öffnet, sieht aber, was SharePoint erlaubt. Darum dem Sekretariat in der Website «Monitoring» nur **Lesen** geben (Gruppe «Besucher») – dann sperrt auch SharePoint jedes Ändern. Für einen echten Schutz der Finanzzahlen vor Usern müssten sie in eine eigene Liste mit eigenen Berechtigungen (möglicher Ausbau).
+- Im lokalen Testbetrieb ist man immer Admin.
+
 ## 3. Bedienung in Kürze
 
 **Standort und Projekt sind getrennt.** Der Standort sagt, wo ein Gerät genau ist (im Feld mit LV95-Position, oder in einem Magazin). Das Projekt ist eine separate, optionale Angabe für Abrechnung und Projekthistorie.
@@ -140,7 +154,7 @@ Der lokale Testmodus hat keine Anmeldung; die Daten liegen dort nur im eigenen B
 
 ## 4. Erweitern
 
-**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.5.7**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.5.7`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
+**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.5.8**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.5.8`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
 
 
 **Neue Attribute ohne Programmieren:** Einstellungen › Kategorien › Kategorie öffnen › **Zusatzfelder** (Text, Zahl, Datum). Die Felder erscheinen sofort in der Maske, im Detail und im Excel-Export.

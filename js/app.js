@@ -7,7 +7,10 @@
 
   /* ---------- Darstellung */
   M.renderView = function () {
-    var v = M.state.view;
+    var v = M.state.view, role = M.role();
+    document.body.classList.toggle('no-fin', !M.can('fin'));
+    document.body.classList.toggle('ro', !M.can('edit'));
+    M.ROLLEN_ORDER.forEach(function (r) { document.body.classList.toggle('role-' + r, r === role); });
     VIEWS.forEach(function (k) { $('v-' + k).hidden = k !== v; });
     document.querySelectorAll('[data-view]').forEach(function (b) {
       if (b.closest('.nav') || b.closest('.tabbar')) b.classList.toggle('on', b.getAttribute('data-view') === v);
@@ -33,6 +36,11 @@
   };
   M.renderBanner = function () {
     var st = M.settings(), el = $('banner');
+    if (M.state.roleTest && M.realRole() === 'admin') {
+      el.hidden = false;
+      el.innerHTML = '<span><b>Ansicht als ' + esc(M.ROLLEN[M.state.roleTest].name) + '.</b> So sieht die App für diese Rolle aus.</span><button type="button" class="link-btn" data-act="role-test" data-k="">Zurück zu Admin ›</button>';
+      return;
+    }
     if (M.store.mode === 'lokal' && st.beispiel) {
       el.hidden = false;
       el.innerHTML = '<span><b>Testbetrieb mit Beispieldaten.</b> Alles bleibt in diesem Browser.</span><button type="button" class="link-btn" data-act="go" data-view="einstellungen">Einstellungen ›</button>';
@@ -246,6 +254,13 @@
     }).join('\r\n');
   }
   function stamp() { return M.today(); }
+  /* User: Spalten mit Beträgen weglassen (Kopfzeile bestimmt, welche) */
+  var FIN_COL = /CHF|Amortis|Restwert|Ertrag/i;
+  function finCols(rows) {
+    if (M.can('fin') || !rows.length) return rows;
+    var keep = rows[0].map(function (h, i) { return FIN_COL.test(String(h)) ? -1 : i; }).filter(function (i) { return i >= 0; });
+    return rows.map(function (r) { return keep.map(function (i) { return r[i]; }); });
+  }
   // lange Ziffernfolgen (SIM) so schreiben, dass Excel sie nicht in 8.94E+19 umwandelt
   function xlText(v) { v = v || ''; return /^\d{12,}$/.test(String(v).replace(/\s/g, '')) ? '="' + v + '"' : v; }
   M.exportGeraete = function (list, fileName) {
@@ -265,9 +280,10 @@
         i.wart ? M.fmtDate(i.wart.letzte) : '', i.wart ? i.wart.tage : '', i.wart ? i.wart.intervall : '', link || '', i.ms ? i.ms.name : (i.members ? i.members.length + ' Geräte' : ''), i.kabel.length || '', g.bemerkung || ''
       ].concat(xk.map(function (k) { return g.extra ? g.extra[k] : ''; })));
     });
-    download(fileName || 'MonInv-Geraete-' + stamp() + '.csv', csv(rows), 'text/csv;charset=utf-8');
+    download(fileName || 'MonInv-Geraete-' + stamp() + '.csv', csv(finCols(rows)), 'text/csv;charset=utf-8');
   };
   M.exportAbrechnung = function (pid) {
+    if (!M.can('fin')) return;
     var I = M.idx(), p = I.proj[pid], r = M.state.abr, A = M.abrechnung(pid, r.von, r.bis), G = M.ABR_GRUPPEN, posten = M.abrPosten(A);
     function rd(x) { return Math.round((x || 0) * 100) / 100; }
     function mtxt(mk) { return mk.slice(5, 7) + '.' + mk.slice(0, 4); }
@@ -301,7 +317,7 @@
       rows.push([g.name, M.typLabel[g.typ], M.ortText(e), p ? M.projName(p) : '', M.auftragOf(e), M.fmtDate(e.von), e.bis ? M.fmtDate(e.bis) : 'laufend',
         Math.max(0, M.days(e.von, e.bis || M.today())), e.ort === 'magazin' ? '' : (M.posRate(e) ? M.posLabel(M.posRate(e).P) : e.amortModus === 'monat' ? 'pro Monat' : 'pauschal'), e.ort === 'magazin' ? '' : (M.posRate(e) ? Math.round(M.posRate(e).rate * 100) / 100 : M.num(e.amortBetrag) || 0), M.einsatzAmort(e), e.gesetztVon || '', e.geholtVon || '', lv ? Math.round(lv.e) : '', lv ? Math.round(lv.n) : '']);
     });
-    download('MonInv-Historie-' + stamp() + '.csv', csv(rows), 'text/csv;charset=utf-8');
+    download('MonInv-Historie-' + stamp() + '.csv', csv(finCols(rows)), 'text/csv;charset=utf-8');
   };
   M.exportKabel = function () {
     var I = M.idx();
@@ -316,6 +332,7 @@
     download('MonInv-Kabel-' + stamp() + '.csv', csv(rows), 'text/csv;charset=utf-8');
   };
   M.exportJson = function () {
+    if (!M.can('admin')) { M.toast('Die Sicherung erstellt ein Admin.', 'err'); return; }
     var out = { app: 'MonInv', appVersion: M.VERSION, version: 2, exportiert: new Date().toISOString() };
     window.MonStore.COLLECTIONS.forEach(function (c) { out[c] = M.state.data[c]; });
     download('MonInv-Sicherung-' + stamp() + '.json', JSON.stringify(out, null, 1), 'application/json');
@@ -517,6 +534,22 @@
       M.state.projSel = d.id; M.state.projMob = 'detail'; M.renderProjekte();
       if (M.isMobile()) { var pg = document.querySelector('#v-projekte .page'); if (pg) pg.scrollTop = 0; }
     },
+    'role-test': function (d) {
+      if (M.realRole() !== 'admin') return;
+      M.state.roleTest = d.k || null;
+      try { if (d.k) sessionStorage.setItem('moninv-roletest', d.k); else sessionStorage.removeItem('moninv-roletest'); } catch (e) { /* privat */ }
+      M.state.drawer = null; M.closeModal && M.closeModal();
+      M.renderView(); M.mapUpdate && M.mapUpdate();
+      M.toast(d.k ? 'Ansicht als ' + M.ROLLEN[d.k].name : 'Wieder als Admin');
+    },
+    'user-add': function () {
+      var mail = String(($('u-mail') || {}).value || '').trim().toLowerCase(), r = ($('u-role') || {}).value || 'user';
+      if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(mail)) { M.toast('Bitte eine gültige E-Mail-Adresse eingeben (z.B. vorname.name@ristag.ch).', 'err'); return; }
+      M.setRolle(mail, r).then(function () { M.toast(mail + ' ist jetzt ' + M.ROLLEN[r].name); });
+    },
+    'user-del': function (d) {
+      M.confirm('Eintrag entfernen?', d.mail + ' gilt danach als User (ohne Finanzen).', 'Entfernen', function () { return M.setRolle(d.mail, null); });
+    },
     'proj-back': function () { M.state.projMob = null; M.renderProjekte(); var pg = document.querySelector('#v-projekte .page'); if (pg) pg.scrollTop = 0; },
     'inv-filt': function () { M.state.invFiltOpen = !M.state.invFiltOpen; M.renderInventar(); },
     'projf': function (d) { M.state.filters.proj.status = d.k; M.state.projSel = null; M.renderProjekte(); },
@@ -658,6 +691,7 @@
       if (d.k === 'projekt' && el.value) setTimeout(M.mapFitAll, 50);
     },
     'invf': function (d, el) { M.state.filters.inv[d.k] = el.value; M.renderInventar(); },
+    'user-role': function (d, el) { M.setRolle(d.mail, el.value).then(function () { M.toast(d.mail + ' ist jetzt ' + M.ROLLEN[el.value].name); }); },
     'inv-sel': function (d, el) { M.state.invSel[d.id] = el.checked; M.renderInventar(); },
     'inv-all': function (d, el) { (M.state.invVisible || []).forEach(function (id) { M.state.invSel[id] = el.checked; }); M.renderInventar(); },
     'mcc': function (d, el) {
@@ -694,6 +728,25 @@
     'k-sync': function () { M.katSync(); }
   };
 
+  /* ---------- Rechte je Aktion
+     Sekretariat (nur lesen): nur diese Aktionen. User: keine Finanzaktionen. */
+  function set(list) { var o = {}; list.split(' ').forEach(function (k) { o[k] = true; }); return o; }
+  var RO_ACT = set('go sel open desel inv-open reload-app file-open dw-files viewer-close viewer-tab open-any abr-q abr-export abr-view abr-pdf ' +
+    'show-map map-goto toggle-grp toggle-kabel layer fit side-open side-close logout drawer-close details dw-tab modal-close modal-bg search-pick ' +
+    'export-csv export-hist export-kabel refresh proj-sel proj-back inv-filt projf proj-map pw-show pw-copy kabel-sel kabel-focus ' +
+    'scan scan-multi scan-mode scan-manual scan-rm sa-show bulk-clear role-test');
+  var RO_CHANGE = set('mapf invf inv-sel inv-all abr projf msa-q');
+  var RO_FORM = set('scan ortsuche');
+  var FIN_ACT = set('abr-q abr-export abr-view abr-pdf pos-new pos-edit pos-del po-grp po-art amort-scope amort-mode');
+  function allowed(an, d) {
+    if (an === 'role-test') return M.realRole() === 'admin';
+    if (an === 'user-add' || an === 'user-del') return M.can('admin');
+    if (!M.can('fin') && (FIN_ACT[an] || (an === 'dw-tab' && d.k === 'amort'))) return false;
+    if (!M.can('edit')) return !!RO_ACT[an] || (an === 'scan-go' && d.k === 'inv');
+    return true;
+  }
+  M.actAllowed = allowed;
+
   function debounce(fn, ms) {
     var t = null;
     return function (a, b) { clearTimeout(t); t = setTimeout(function () { fn(a, b); }, ms); };
@@ -708,13 +761,15 @@
         if (!e.target.closest('.search')) renderSearch('');
         return;
       }
-      var fn = ACT[el.getAttribute('data-act')];
+      var an = el.getAttribute('data-act'), fn = ACT[an];
+      if (fn && !allowed(an, el.dataset)) { e.preventDefault(); if (!M.can('fin') && FIN_ACT[an]) M.toast('Finanzbereich: nur für Admin und Sekretariat.', 'err'); else M.denied(); return; }
       if (fn) fn(el.dataset, el, e);
     });
     document.addEventListener('change', function (e) {
       var el = e.target.closest('[data-change]');
       if (!el) return;
-      var fn = CHANGE[el.getAttribute('data-change')];
+      var cn = el.getAttribute('data-change'), fn = CHANGE[cn];
+      if (fn && !M.can('edit') && !RO_CHANGE[cn]) { if (el.type === 'file') el.value = ''; M.denied(); return; }
       if (fn) fn(el.dataset, el);
     });
     document.addEventListener('input', function (e) {
@@ -727,6 +782,7 @@
       var f = e.target.closest('form[data-form]');
       if (!f) return;
       e.preventDefault();
+      if (!M.can('edit') && !RO_FORM[f.getAttribute('data-form')]) { M.denied(); return; }
       /* offenes «Neues Projekt»-Feld mit Name: zuerst anlegen, dann weiter */
       var np = f.querySelector('.np-box:not(.npos-box):not([hidden])'), sub = e.submitter, pr;
       if (np) {
@@ -745,7 +801,8 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('data-enter')) {
         e.preventDefault();
-        var fn = ACT[e.target.getAttribute('data-enter')];
+        var en = e.target.getAttribute('data-enter'), fn = ACT[en];
+        if (fn && !allowed(en, e.target.dataset)) { M.denied(); return; }
         if (fn) fn(e.target.dataset, e.target, e);
         return;
       }

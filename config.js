@@ -8,6 +8,8 @@
 
 window.MONINV_CONFIG = {
   modus: 'sharepoint',
+  // Admins (immer alle Rechte, auch Benutzer und Rollen). Weitere Rollen vergibt ein Admin unter Einstellungen › Benutzer und Rollen.
+  admins: ['n.rohr@ristag.ch'],
   qrAdresse: 'https://rohrnico.github.io/MonInv/',
   sharepoint: {
     tenantId: '021f91fa-e689-4c95-8480-d96da66cc2e1',

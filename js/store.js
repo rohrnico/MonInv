@@ -198,6 +198,7 @@
         return self.pca.loginRedirect({ scopes: SCOPES }).then(function () { return new Promise(function () {}); });
       }
       self.userName = self.account.name || self.account.username || '';
+      self.userEmail = String(self.account.username || '').toLowerCase();
       return self._resolveSite();
     });
   };

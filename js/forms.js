@@ -8,6 +8,8 @@
   function opt(v, label, sel) { return '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(label) + '</option>'; }
   function fld(label, inner, cls) { return '<label class="fld ' + (cls || '') + '"><span>' + label + '</span>' + inner + '</label>'; }
   function sec(t) { return '<h3 class="fsec">' + t + '</h3>'; }
+  /* Feld des Finanzbereichs: für User ausgeblendet (Wert bleibt im Formular und wird unverändert gespeichert) */
+  function finFld(label, inner) { return fld(label, inner, 'fin'); }
   function inp(id, v, attrs) { return '<input id="' + id + '" value="' + esc(v === null || v === undefined ? '' : v) + '" ' + (attrs || '') + '>'; }
 
   /* ---------- Rahmen */
@@ -392,11 +394,12 @@
         '<button type="button" class="btn ghost sm" data-act="pw-toggle" data-for="g-wlan">Zeigen</button></div></div>';
     }
     if (t === 'tachymeter') b += mccSelect('g-mcc', gid, d.mccId);
-    b += '</div>' + sec('Wert & Amortisation') + '<div class="grid2">';
+    b += '</div>' + sec(M.can('fin') ? 'Wert & Amortisation' : 'Kauf') + '<div class="grid2">';
     b += fld('Kaufdatum', inp('g-kauf', d.kaufdatum, 'type="date"'));
-    b += fld('Anschaffungswert', '<div class="unit-in"><input id="g-wert" value="' + esc(M.has(d.wert) ? d.wert : '') + '" inputmode="decimal" class="r"><i>CHF</i></div>');
-    b += fld('Bereits amortisiert vor Erfassung', '<div class="unit-in"><input id="g-vor" value="' + esc(M.has(d.amortVor) ? d.amortVor : '') + '" inputmode="decimal" class="r" placeholder="0"><i>CHF</i></div>');
-    b += fld('Stand per', inp('g-vordat', d.amortVorDatum || (gid ? '' : M.today()), 'type="date"'));
+    // Finanzfelder für User nur ausgeblendet: die Werte bleiben beim Speichern erhalten
+    b += finFld('Anschaffungswert', '<div class="unit-in"><input id="g-wert" value="' + esc(M.has(d.wert) ? d.wert : '') + '" inputmode="decimal" class="r"><i>CHF</i></div>');
+    b += finFld('Bereits amortisiert vor Erfassung', '<div class="unit-in"><input id="g-vor" value="' + esc(M.has(d.amortVor) ? d.amortVor : '') + '" inputmode="decimal" class="r" placeholder="0"><i>CHF</i></div>');
+    b += finFld('Stand per', inp('g-vordat', d.amortVorDatum || (gid ? '' : M.today()), 'type="date"'));
     b += '</div>' + sec('Wartung & Zustand') + '<div class="grid2">';
     var defInt = st.intervall ? st.intervall[t] : null;
     b += fld('Letzte Wartung', inp('g-lw', d.letzteWartung, 'type="date"'));
@@ -563,7 +566,7 @@
       var hint = '';
       if (key === 'ort') hint = ' · ' + esc(i.ortText);
       if (key === 'projekt' && i.proj) hint = ' · ' + esc(M.projName(i.proj));
-      b += '<label class="chk"><input type="checkbox" id="dup-f-' + key + '"' + (on ? ' checked' : '') + '> ' + esc(label) + '<span class="muted">' + hint + '</span></label>';
+      b += '<label class="chk' + ({ wert: 1, vor: 1, amort: 1 }[key] ? ' fin' : '') + '"><input type="checkbox" id="dup-f-' + key + '"' + (on ? ' checked' : '') + '> ' + esc(label) + '<span class="muted">' + hint + '</span></label>';
     }
     b += '</div></div><p class="muted small">Ohne «Gleiche Position» stehen die neuen Geräte im Feld mit «Position fehlt», bis sie vor Ort gesetzt sind.</p>';
     M.modal({ title: 'Duplizieren', form: 'dup', body: b, foot: foot(n + ' Geräte anlegen') });
@@ -645,6 +648,7 @@
       if (t.ort === 'feld' && c.gids.some(function (id) { var g = I.ger[id]; return g.typ === 'tachymeter' && !g.mccId; })) lines.push('<span class="warn-t">! Tachymeter ohne MCC – danach einzeln zuordnen</span>');
       if (t.ort === 'feld' && M.has(t.lat)) lines.push('○ Alle erhalten dieselbe Position – einzeln korrigieren über «Position ändern»');
     }
+    if (!M.can('fin')) lines = lines.filter(function (l) { return !/CHF|Amortisation|Restwert|Vorhalten/.test(l); });
     $('mv-prev').innerHTML = '<b>Das passiert beim Speichern</b>' + lines.map(function (l) { return '<span>' + l + '</span>'; }).join('');
   };
   M.submitMove = function () {
@@ -982,7 +986,7 @@
       fld('Datum', inp('w-date', w ? w.datum : M.today(), 'type="date" required')) +
       fld('Art', '<select id="w-art">' + arten.map(function (a) { return opt(a, a, w ? w.art === a : a === 'Service'); }).join('') + '</select>') +
       fld('Firma', inp('w-firma', w ? w.firma : (g.hersteller || ''), 'maxlength="60"')) +
-      fld('Kosten CHF', inp('w-kosten', w ? w.kosten : '', 'inputmode="decimal" class="r"')) + '</div>' +
+      finFld('Kosten CHF', inp('w-kosten', w ? w.kosten : '', 'inputmode="decimal" class="r"')) + '</div>' +
       fld('Bemerkung', '<textarea id="w-bem" rows="2">' + esc(w ? w.bemerkung || '' : '') + '</textarea>', 'full') +
       '<p class="muted small">Eine Wartung setzt den Zähler «In Betrieb seit letzter Wartung» auf 0.</p>';
     M.modal({ title: wid ? 'Wartung bearbeiten' : 'Wartung erfassen', form: 'wartung', body: b, foot: foot('Speichern', wid ? '<button type="button" class="btn ghost danger-t" data-act="w-del">Löschen</button>' : '') });

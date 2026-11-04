@@ -302,7 +302,7 @@
       if (mc) {
         var mi = M.info(mc.id);
         h += '<button type="button" class="addon-b" data-act="open" data-id="' + mc.id + '">' + M.symbol(mc.id, 30) + '<span class="rb-t"><b>' + esc(mc.name) + '</b><span>' +
-          esc([mc.gtyp, mc.sim ? 'SIM ' + mc.sim : 'ohne SIM', full ? 'Restwert CHF ' + M.chf(mi.restwert) : ''].filter(Boolean).join(' · ')) + '</span></span><span class="chev">›</span></button>';
+          esc([mc.gtyp, mc.sim ? 'SIM ' + mc.sim : 'ohne SIM', full && M.can('fin') ? 'Restwert CHF ' + M.chf(mi.restwert) : ''].filter(Boolean).join(' · ')) + '</span></span><span class="chev">›</span></button>';
       } else h += '<p class="muted small">Keine MCC zugeordnet.</p>';
       h += '</div>';
     }
@@ -319,8 +319,8 @@
     if (g.seriennummer) h += attr('Seriennummer', esc(g.seriennummer), 'mono');
     if (full) {
       h += attr('Kaufdatum', M.fmtDate(g.kaufdatum));
-      h += attr('Anschaffungswert', M.has(g.wert) ? 'CHF ' + M.chf(g.wert) : '–');
-      h += attr('Amortisation', i.ertrag ? '<span class="ok-t">abbezahlt · CHF ' + M.chf(i.ertrag) + ' Ertrag</span>' : (i.restwert !== null ? 'noch CHF ' + M.chf(i.restwert) + ' offen' : '–') +
+      if (M.can('fin')) h += attr('Anschaffungswert', M.has(g.wert) ? 'CHF ' + M.chf(g.wert) : '–');
+      if (M.can('fin')) h += attr('Amortisation', i.ertrag ? '<span class="ok-t">abbezahlt · CHF ' + M.chf(i.ertrag) + ' Ertrag</span>' : (i.restwert !== null ? 'noch CHF ' + M.chf(i.restwert) + ' offen' : '–') +
         ' <button type="button" class="link-btn" data-act="dw-tab" data-k="amort">Details</button>');
     }
     if (g.typ !== 'tachymeter' || g.sim) h += attr('SIM-Karte', g.sim ? esc(g.sim) : '<span class="muted">keine</span>', g.sim ? 'mono' : '');
@@ -431,7 +431,7 @@
     h += '<label class="chk m-only inv-allm"><input type="checkbox" data-change="inv-all" aria-label="Alle auswählen"' + (disp.length && disp.every(function (g) { return sel[g.id]; }) ? ' checked' : '') + '> Alle ' + disp.length + ' auswählen</label>';
     h += '<div class="tbl-wrap"><table class="tbl cards inv-tbl"><thead><tr><th class="c-chk"><input type="checkbox" id="inv-all" data-change="inv-all" aria-label="Alle auswählen"' +
       (disp.length && disp.every(function (g) { return sel[g.id]; }) ? ' checked' : '') + '></th><th></th><th>Name</th><th>Kategorie</th><th>Standort</th><th>Projekt</th><th>Hersteller</th><th>Seriennr.</th><th>Kaufdatum</th>' +
-      '<th class="r">Wert</th><th class="r">Restwert</th><th>SIM</th><th>Zustand</th></tr></thead><tbody>';
+      '<th class="r fin">Wert</th><th class="r fin">Restwert</th><th>SIM</th><th>Zustand</th></tr></thead><tbody>';
     function uniq(arr) { var o = {}; arr.forEach(function (x) { if (M.has(x) && x !== '') o[x] = 1; }); return Object.keys(o); }
     function devRow(g, child) {
       var i = M.info(g.id);
@@ -444,8 +444,8 @@
         '<td class="c-proj' + (child || i.proj || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (child ? '' : i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(g.hersteller || '') + '</td><td class="mono m-hide">' + esc(g.seriennummer || '') + '</td>' +
         '<td class="mono m-hide">' + M.fmtDate(g.kaufdatum) + '</td>' +
-        '<td class="r mono m-hide">' + M.chf(g.wert) + '</td>' +
-        '<td class="r mono calc c-rest" data-l="Restwert">' + M.chf(i.restwert) + '</td>' +
+        '<td class="r mono m-hide fin">' + M.chf(g.wert) + '</td>' +
+        '<td class="r mono calc c-rest fin" data-l="Restwert">' + M.chf(i.restwert) + '</td>' +
         '<td class="m-hide ' + (g.sim ? 'mono' : 'muted') + '">' + esc(g.sim || 'keine') + '</td>' +
         '<td class="c-zst">' + M.stateChip(g.id) + '</td></tr>';
     }
@@ -472,12 +472,12 @@
         '<td class="c-proj">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(her.length === 1 ? her[0] : her.length ? 'gemischt' : '') + '</td><td class="muted m-hide">' + mem.length + ' Stk.</td>' +
         '<td class="mono m-hide">' + (kd.length === 1 ? M.fmtDate(kd[0]) : kd.length ? M.fmtDate(kd[0]) + ' –<br>' + M.fmtDate(kd[kd.length - 1]) : '–') + '</td>' +
-        '<td class="r mono m-hide">' + M.chf(w) + '</td><td class="r mono calc c-rest" data-l="Restwert">' + M.chf(r) + '</td>' +
+        '<td class="r mono m-hide fin">' + M.chf(w) + '</td><td class="r mono calc c-rest fin" data-l="Restwert">' + M.chf(r) + '</td>' +
         '<td class="m-hide ' + (nSim ? '' : 'muted') + '">' + (nSim ? nSim + ' SIM' : 'keine') + '</td><td class="c-zst">' + M.stateChip(g.id) + '</td></tr>';
       if (isOpen) shown.forEach(function (m) { h += devRow(m, true); });
     });
     if (!disp.length) h += '<tr><td colspan="13" class="empty">Keine Geräte für diese Filter.</td></tr>';
-    h += '</tbody><tfoot><tr><td colspan="9" class="c-foot">' + nGer + ' Geräte' + (function () { var k = Object.keys(seenMs), n = 0; k.forEach(function (id) { n += (I.members[id] || []).length; }); return k.length ? ' · ' + n + ' davon in ' + k.length + (k.length === 1 ? ' Messstelle' : ' Messstellen') : ''; })() + '</td><td class="r mono" data-l="Wert">' + M.chf(sumW) + '</td><td class="r mono calc" data-l="Restwert">' + M.chf(sumR) + '</td><td colspan="2" class="muted m-hide">Restwert = Wert − gebuchte Amortisation</td></tr></tfoot></table></div></div>';
+    h += '</tbody><tfoot><tr><td colspan="9" class="c-foot">' + nGer + ' Geräte' + (function () { var k = Object.keys(seenMs), n = 0; k.forEach(function (id) { n += (I.members[id] || []).length; }); return k.length ? ' · ' + n + ' davon in ' + k.length + (k.length === 1 ? ' Messstelle' : ' Messstellen') : ''; })() + '</td><td class="r mono fin" data-l="Wert">' + M.chf(sumW) + '</td><td class="r mono calc fin" data-l="Restwert">' + M.chf(sumR) + '</td><td colspan="2" class="muted m-hide fin">Restwert = Wert − gebuchte Amortisation</td></tr></tfoot></table></div></div>';
     keepScroll($('v-inventar'), h);
   };
 
@@ -510,12 +510,12 @@
     if (!tss.length) h += '<tr><td colspan="11" class="empty">Noch keine Tachymeter erfasst.</td></tr>';
     h += '</tbody></table></div><p class="muted small">‖ = Zähler steht, Gerät im Magazin. Die MCC wechselt den Standort mit ihrem Tachymeter und erscheint nicht separat auf der Karte. Kommt der Tachymeter ins Magazin, wird die MCC frei.</p>';
 
-    h += '<h2 class="h2">MCC TSC</h2><div class="tbl-wrap"><table class="tbl cards mcc-tbl"><thead><tr><th></th><th>Seriennummer</th><th>Typ</th><th>An Tachymeter</th><th>Standort</th><th>SIM</th><th class="r">Restwert</th></tr></thead><tbody>';
+    h += '<h2 class="h2">MCC TSC</h2><div class="tbl-wrap"><table class="tbl cards mcc-tbl"><thead><tr><th></th><th>Seriennummer</th><th>Typ</th><th>An Tachymeter</th><th>Standort</th><th>SIM</th><th class="r fin">Restwert</th></tr></thead><tbody>';
     mccs.forEach(function (m) {
       var i = M.info(m.id), t = i.mccTs;
       h += '<tr><td class="c-sym">' + M.symbol(m.id, 24) + '</td><td class="c-name"><button type="button" class="link-btn strong" data-act="open" data-id="' + m.id + '">' + esc(m.name) + '</button></td>' +
         '<td class="c-kat">' + esc(m.gtyp || '') + '</td><td class="c-zst">' + (t ? '<button type="button" class="link-btn" data-act="open" data-id="' + t.id + '">' + esc(t.name) + '</button>' : '<span class="chip chip-free">frei</span>') + '</td>' +
-        '<td class="c-ort">' + esc(t ? 'mit ' + t.name : i.ortText) + '</td><td class="c-sim ' + (m.sim ? 'mono' : 'muted') + '" data-l="SIM">' + esc(m.sim || 'keine') + '</td><td class="r mono calc c-rest" data-l="Restwert">' + M.chf(i.restwert) + '</td></tr>';
+        '<td class="c-ort">' + esc(t ? 'mit ' + t.name : i.ortText) + '</td><td class="c-sim ' + (m.sim ? 'mono' : 'muted') + '" data-l="SIM">' + esc(m.sim || 'keine') + '</td><td class="r mono calc c-rest fin" data-l="Restwert">' + M.chf(i.restwert) + '</td></tr>';
     });
     if (!mccs.length) h += '<tr><td colspan="7" class="empty">Noch keine MCC erfasst.</td></tr>';
     h += '</tbody></table></div></div>';
@@ -675,18 +675,18 @@
     eins.forEach(function (e) { ger[e.geraetId] = true; tage += Math.max(0, M.days(e.von, e.bis || heute)); amort += M.einsatzAmort(e); });
     var nKab = mag ? 0 : M.state.data.kabel.filter(function (k) { return k.projektId === p.id; }).length;
     var verr = 0;
-    if (!mag && eins.length) verr = M.abrechnung(p.id, eins[0].von.slice(0, 7), M.today().slice(0, 7)).total.t;
+    if (!mag && eins.length && M.can('fin')) verr = M.abrechnung(p.id, eins[0].von.slice(0, 7), M.today().slice(0, 7)).total.t;
     var h = '<div class="pd-h"><div><h2>' + esc(M.projName(p)) + '</h2><span class="muted">' + (mag ? 'Magazin' : 'Projekt') + ' · ' + (p.status === 'abgeschlossen' ? 'abgeschlossen' : 'aktiv') +
       (M.has(p.lat) ? ' · LV95 ' + M.fmtLv95(p.lat, p.lng) : (mag ? ' · <span class="warn-t">Ort fehlt</span>' : '')) + (nKab ? ' · ' + nKab + ' Kabel' : '') + '</span></div><span class="grow"></span>' +
       '<button type="button" class="btn ghost sm" data-act="proj-map" data-id="' + p.id + '">Auf Karte</button>' +
       '<button type="button" class="btn ghost sm" data-act="edit-proj" data-id="' + p.id + '">Bearbeiten</button></div>';
     h += '<div class="tiles4"><div class="tile"><b>' + jetzt.length + '</b><span>Geräte jetzt ' + (mag ? 'hier' : 'im Projekt') + '</span></div><div class="tile"><b>' + Object.keys(ger).length + '</b><span>Geräte insgesamt</span></div>' +
       '<div class="tile"><b>' + M.chf(tage) + '</b><span>Gerätetage</span></div>' +
-      (!mag ? '<div class="tile t-blue"><b>CHF ' + M.chf(verr) + '</b><span>Verrechnet bis heute</span></div>' : '<div class="tile"><b>–</b><span>Magazin: keine Amortisation</span></div>') + '</div>';
+      (!mag ? (M.can('fin') ? '<div class="tile t-blue"><b>CHF ' + M.chf(verr) + '</b><span>Verrechnet bis heute</span></div>' : '<div class="tile"><b>' + jetzt.filter(function (e) { return e.ort === 'feld'; }).length + '</b><span>Geräte im Feld</span></div>') : '<div class="tile"><b>–</b><span>Magazin: keine Amortisation</span></div>') + '</div>';
 
-    if (!mag) h += posHtml(p);
-    if (!mag) h += abrHtml(p);
-    if (!mag) h += '<div class="sec-h"><span>Dokumente · Offerte, Pläne</span></div>' + M.filesHtml('projekt', p.id, { compactUpload: true });
+    if (!mag && M.can('fin')) h += posHtml(p);
+    if (!mag && M.can('fin')) h += abrHtml(p);
+    if (!mag) h += '<div class="sec-h"><span>Dokumente · ' + (M.can('fin') ? 'Offerte, Pläne' : 'Pläne, Berichte') + '</span></div>' + M.filesHtml('projekt', p.id, { compactUpload: true });
     if (jetzt.length) {
       h += '<div class="sec-h"><span>Jetzt ' + (mag ? 'hier' : 'im Projekt') + '</span></div><div class="chips-wrap">';
       Object.keys(msJetzt).sort(function (a, b) { return String(I.ger[a].name).localeCompare(String(I.ger[b].name), 'de', { numeric: true }); }).forEach(function (mid) {
@@ -752,10 +752,11 @@
         (store.persistent ? '' : '<p class="hint warn">Dieser Browser erlaubt kein dauerhaftes Speichern. Änderungen gehen beim Schliessen verloren.</p>') +
         '<label class="fld inline"><span>Mein Kürzel (für «gesetzt / geholt von»)</span><input id="set-kuerzel" maxlength="12" value="' + esc(st.kuerzel || '') + '" data-change="set-kuerzel"></label>';
     } else {
-      h += '<p class="muted">Angemeldet als <b>' + esc(store.userName || '–') + '</b> (Microsoft 365). Die App aktualisiert sich jede Minute und beim Zurückkehren in den Tab.</p>' +
+      h += '<p class="muted">Angemeldet als <b>' + esc(store.userName || '–') + '</b>' + (M.userEmail() ? ' (' + esc(M.userEmail()) + ')' : '') + ' · Rolle <b>' + esc(M.ROLLEN[M.realRole()].name) + '</b>. Die App aktualisiert sich jede Minute und beim Zurückkehren in den Tab.</p>' +
         '<button type="button" class="btn ghost sm" data-act="refresh">Jetzt aktualisieren</button> <button type="button" class="btn ghost sm" data-act="logout">Abmelden</button>';
     }
     h += '</section>';
+    if (M.realRole() === 'admin') h += rollenHtml();
 
     h += '<section class="card"><h2>Wartung</h2><form class="grid3" data-form="settings-wartung">' +
       '<label class="fld"><span>Tachymeter, Monate</span><input id="set-int-ts" type="number" min="1" max="120" value="' + esc(st.intervall.tachymeter || '') + '"></label>' +
@@ -793,24 +794,55 @@
       '<button type="button" class="btn ghost" data-act="export-csv">Geräte als Excel (CSV)</button>' +
       '<button type="button" class="btn ghost" data-act="export-hist">Historie als Excel (CSV)</button>' +
       '<button type="button" class="btn ghost" data-act="export-kabel">Kabel als Excel (CSV)</button>' +
-      '<label class="btn ghost file-btn">Geräte aus CSV importieren<input type="file" accept=".csv,text/csv" data-change="import-csv"></label>' +
-      '<button type="button" class="btn ghost" data-act="csv-vorlage">CSV-Vorlage</button>' +
-      '<button type="button" class="btn ghost" data-act="export-json">Sicherung exportieren</button>' +
-      '<label class="btn ghost file-btn">Sicherung importieren<input id="imp-json" type="file" accept=".json,application/json" data-change="import-json"></label></div>' +
+      (M.can('edit') ? '<label class="btn ghost file-btn">Geräte aus CSV importieren<input type="file" accept=".csv,text/csv" data-change="import-csv"></label>' +
+      '<button type="button" class="btn ghost" data-act="csv-vorlage">CSV-Vorlage</button>' : '') +
+      (M.can('admin') ? '<button type="button" class="btn ghost" data-act="export-json">Sicherung exportieren</button>' +
+      '<label class="btn ghost file-btn">Sicherung importieren<input id="imp-json" type="file" accept=".json,application/json" data-change="import-json"></label>' : '') + '</div>' +
+      (M.can('fin') ? '' : '<p class="muted small">Exporte ohne Finanzspalten (Wert, Amortisation, Restwert). Sicherung und Rollen verwaltet ein Admin.</p>') +
       '<p class="muted small">Die Sicherung enthält alle Geräte, Kategorien, Projekte, Einsätze, Wartungen und Kabel als JSON-Datei. Beim Import werden Datensätze mit gleicher ID überschrieben.</p>' +
       '<p class="muted small"><b>CSV-Import</b> nimmt dasselbe Format wie der Excel-Export: Export machen, in Excel ergänzen, als CSV speichern und wieder importieren. Abgleich über den Namen; neue Namen werden neu angelegt, leere Zellen ändern nichts. Vor dem Import zeigt eine Vorschau, was passiert.</p>';
-    if (st.beispiel) h += '<div class="hint">Zurzeit sind <b>Beispieldaten</b> geladen. <button type="button" class="btn sm danger" data-act="clear-sample">Alle Daten löschen und leer starten</button></div>';
+    if (st.beispiel && M.can('admin')) h += '<div class="hint">Zurzeit sind <b>Beispieldaten</b> geladen. <button type="button" class="btn sm danger" data-act="clear-sample">Alle Daten löschen und leer starten</button></div>';
     if (store.mode === 'lokal') h += '<p><button type="button" class="link-btn" data-act="reset-sample">Beispieldaten neu laden</button></p>';
     h += '</section><p class="muted small">MonInv Version ' + M.VERSION + ' · Monitoring-Inventar RISTAG Ingenieure AG · Kartendaten © swisstopo</p></div>';
     keepScroll($('v-einstellungen'), h);
   };
+
+  /* ---------- Benutzer und Rollen (nur Admin) */
+  function rollenHtml() {
+    var st = M.settings(), r = st.rollen || {}, admins = M.cfgAdmins(), me = M.userEmail();
+    var mails = Object.keys(r).filter(function (m) { return admins.indexOf(m) < 0; }).sort();
+    var ropt = function (sel) { return M.ROLLEN_ORDER.map(function (k) { return opt(k, M.ROLLEN[k].name, sel === k); }).join(''); };
+    var h = '<section class="card" id="sec-rollen"><h2>Benutzer und Rollen</h2>' +
+      '<div class="rl-info">' + M.ROLLEN_ORDER.map(function (k) { return '<div><b>' + M.ROLLEN[k].name + '</b><span>' + esc(M.ROLLEN[k].text) + '</span></div>'; }).join('') + '</div>' +
+      '<p class="muted small">Wer hier nicht steht, ist <b>User</b>. Für echten Schutz beim Sekretariat diese Personen in der SharePoint-Website zusätzlich nur mit <b>Lesen</b> berechtigen (Besucher).</p>';
+    if (M.state.roleTest) h = '<section class="card" id="sec-rollen"><h2>Benutzer und Rollen</h2><p class="muted small">Sie sehen die App gerade als <b>' + esc(M.ROLLEN[M.state.roleTest].name) + '</b>. Benutzer verwalten geht in der Admin-Ansicht.</p>';
+    else {
+    h += '<div class="rl-list">';
+    admins.forEach(function (m) {
+      h += '<div class="rl-row"><span class="rl-m">' + esc(m) + (m === me ? ' <span class="muted">(Sie)</span>' : '') + '</span><span class="rl-fix">Admin <span class="muted small">fest in config.js</span></span><span class="rl-x"></span></div>';
+    });
+    mails.forEach(function (m) {
+      h += '<div class="rl-row"><span class="rl-m">' + esc(m) + (m === me ? ' <span class="muted">(Sie)</span>' : '') + '</span>' +
+        '<label class="rl-sel"><span class="sr">Rolle für ' + esc(m) + '</span><select class="sel-sm" data-change="user-role" data-mail="' + esc(m) + '">' + ropt(r[m]) + '</select></label>' +
+        '<button type="button" class="ic-btn rl-x" data-act="user-del" data-mail="' + esc(m) + '" aria-label="' + esc(m) + ' entfernen" title="Entfernen">×</button></div>';
+    });
+    if (!admins.length && !mails.length) h += '<p class="hint warn">Noch niemand ist als Admin bestimmt – bis dahin sind alle Admin. Zuerst die eigene Adresse als Admin eintragen.</p>';
+    h += '</div><div class="rl-add"><label class="fld"><span>E-Mail</span><input id="u-mail" type="email" autocomplete="off" placeholder="vorname.name@ristag.ch" data-enter="user-add"></label>' +
+      '<label class="fld"><span>Rolle</span><select id="u-role">' + ropt('sekretariat') + '</select></label>' +
+      '<div class="fld-end"><button type="button" class="btn" data-act="user-add">Hinzufügen</button></div></div>';
+    }
+    h += '<div class="rl-test"><span class="lbl">Ansicht testen</span><div class="seg" role="group" aria-label="Ansicht als">' +
+      M.ROLLEN_ORDER.map(function (k) { var on = (M.state.roleTest || 'admin') === k; return '<button type="button" data-act="role-test" data-k="' + (k === 'admin' ? '' : k) + '" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '">' + M.ROLLEN[k].name + '</button>'; }).join('') +
+      '</div><span class="muted small">Zeigt die App so, wie sie die Rolle sieht (nur in diesem Tab).</span></div></section>';
+    return h;
+  }
 
   /* ================================================== DATEIEN */
   var ICO_PDF = '<svg viewBox="0 0 40 48" aria-hidden="true"><path d="M4 2h22l10 10v34H4z" fill="#fff" stroke="#B42318" stroke-width="2"/><path d="M26 2v10h10" fill="none" stroke="#B42318" stroke-width="2"/><text x="20" y="35" text-anchor="middle" font-family="Exo 2, sans-serif" font-weight="800" font-size="11" fill="#B42318">PDF</text></svg>';
   var ICO_FILE = '<svg viewBox="0 0 40 48" aria-hidden="true"><path d="M4 2h22l10 10v34H4z" fill="#fff" stroke="#5E5C5B" stroke-width="2"/><path d="M26 2v10h10" fill="none" stroke="#5E5C5B" stroke-width="2"/></svg>';
   function fileIcon(f) { return f.thumb ? '<img src="' + f.thumb + '" alt="">' : M.isPdf(f) ? ICO_PDF : ICO_FILE; }
   function uploadBox(ziel, zielId, small) {
-    var arten = M.DATEI_ARTEN[ziel];
+    var arten = M.dateiArten(ziel);
     return '<div class="dz' + (small ? ' dz-sm' : '') + '" data-ziel="' + ziel + '" data-id="' + zielId + '">' +
       '<svg class="dz-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>' +
       '<span class="dz-t"><b>Dateien hierher ziehen</b> oder <label class="link-btn file-in">auswählen<input type="file" multiple accept="image/*,application/pdf,.dwg,.dxf,.xlsx,.docx,.zip" data-change="file-up" data-ziel="' + ziel + '" data-id="' + zielId + '"></label></span>' +
@@ -819,9 +851,9 @@
   }
   M.filesHtml = function (ziel, zielId, opts) {
     opts = opts || {};
-    var list = M.idx().dat[zielId] || [], arten = M.DATEI_ARTEN[ziel];
+    var list = (M.idx().dat[zielId] || []).filter(M.fileVisible), arten = M.dateiArten(ziel);
     var h = uploadBox(ziel, zielId, opts.compactUpload);
-    if (!list.length) return h + '<p class="muted small">' + (ziel === 'projekt' ? 'Noch keine Dokumente. Offerte als PDF hier ablegen.' : 'Noch keine Pläne. Messplan, Fixpunktplan, Skizzen oder Fotos als Bild oder PDF hochladen – im Feld dann direkt am Gerät ansehen.') + '</p>';
+    if (!list.length) return h + '<p class="muted small">' + (ziel === 'projekt' ? (M.can('fin') ? 'Noch keine Dokumente. Offerte als PDF hier ablegen.' : 'Noch keine Dokumente.') : 'Noch keine Pläne. Messplan, Fixpunktplan, Skizzen oder Fotos als Bild oder PDF hochladen – im Feld dann direkt am Gerät ansehen.') + '</p>';
     var groups = {};
     list.forEach(function (f) { (groups[f.art] = groups[f.art] || []).push(f); });
     arten.concat([['?', 'Weitere']]).forEach(function (a) {
@@ -836,14 +868,14 @@
     files.forEach(function (f) {
       h += '<div class="ft"><button type="button" class="ft-open" data-act="file-open" data-id="' + f.id + '" title="' + esc(f.name) + ' öffnen"><span class="ft-th">' + fileIcon(f) + '</span>' +
         '<span class="ft-n">' + esc(f.name) + '</span><span class="ft-m">' + M.fmtDate(f.datum) + ' · ' + M.fmtSize(f.groesse) + (f.wer ? ' · ' + esc(f.wer) : '') + '</span></button>' +
-        '<span class="ft-a"><select data-change="file-art" data-id="' + f.id + '" aria-label="Art von ' + esc(f.name) + '">' + M.DATEI_ARTEN[ziel].map(function (a) { return opt(a[0], a[1], a[0] === f.art); }).join('') + '</select>' +
+        '<span class="ft-a"><select data-change="file-art" data-id="' + f.id + '" aria-label="Art von ' + esc(f.name) + '">' + M.dateiArten(ziel).map(function (a) { return opt(a[0], a[1], a[0] === f.art); }).join('') + '</select>' +
         '<button type="button" class="ic-btn" data-act="file-del" data-id="' + f.id + '" aria-label="' + esc(f.name) + ' löschen" title="Löschen">×</button></span></div>';
     });
     return h + '</div></div>';
   }
   /* Kartenpanel: Pläne schnell öffnen, auch auf dem Handy */
   M.filesCompact = function (ziel, zielId) {
-    var list = M.idx().dat[zielId] || [];
+    var list = (M.idx().dat[zielId] || []).filter(M.fileVisible);
     var h = '<div class="sec-h"><span>Pläne · ' + list.length + '</span><label class="link-btn file-in">+ hochladen<input type="file" multiple accept="image/*,application/pdf" data-change="file-up" data-ziel="' + ziel + '" data-id="' + zielId + '"></label></div>';
     if (!list.length) return h + '<p class="muted small">Keine Pläne hinterlegt.</p>';
     h += '<div class="fc">';
@@ -881,8 +913,8 @@
     h += attr('Seit', i.cur ? M.fmtDate(i.cur.von) : '–');
     h += attr('Position LV95', i.posSrc === 'eigen' ? M.fmtLv95(i.pos.lat, i.pos.lng) : (i.isMag ? 'im Magazin' : '<span class="warn-t">nicht gesetzt</span>'), i.posSrc === 'eigen' ? 'mono' : '');
     if (full) {
-      h += attr('Anschaffungswert total', 'CHF ' + M.chf(wert));
-      h += attr('Amortisation total', ertrag ? '<span class="ok-t">CHF ' + M.chf(sum) + ' · Ertrag CHF ' + M.chf(ertrag) + '</span>' : 'CHF ' + M.chf(sum) + ' · noch CHF ' + M.chf(rest) + ' offen');
+      if (M.can('fin')) h += attr('Anschaffungswert total', 'CHF ' + M.chf(wert));
+      if (M.can('fin')) h += attr('Amortisation total', ertrag ? '<span class="ok-t">CHF ' + M.chf(sum) + ' · Ertrag CHF ' + M.chf(ertrag) + '</span>' : 'CHF ' + M.chf(sum) + ' · noch CHF ' + M.chf(rest) + ' offen');
     }
     if (g.bemerkung) h += attr('Bemerkung', esc(g.bemerkung), 'pre');
     h += '</div>';
@@ -924,8 +956,9 @@
   M.drawerHtml = function (gid, tab) {
     tab = tab || 'geraet';
     var isMs = !!M.info(gid).members;
-    var nF = (M.idx().dat[gid] || []).length;
-    var tabs = [['geraet', isMs ? 'Messstelle' : 'Gerät'], ['dateien', 'Pläne & Dateien' + (nF ? ' <span class="tab-n">' + nF + '</span>' : '')], ['hist', 'Historie'], ['amort', 'Amortisation']];
+    var nF = (M.idx().dat[gid] || []).filter(M.fileVisible).length;
+    var tabs = [['geraet', isMs ? 'Messstelle' : 'Gerät'], ['dateien', 'Pläne & Dateien' + (nF ? ' <span class="tab-n">' + nF + '</span>' : '')], ['hist', 'Historie']];
+    if (M.can('fin')) tabs.push(['amort', 'Amortisation']); else if (tab === 'amort') tab = 'geraet';
     var h = '<div class="dw-bg" data-act="drawer-close"></div><div class="dw" role="dialog" aria-modal="true" aria-labelledby="dw-t">' +
       '<div class="dw-h"><div class="dw-id">' + M.detailHead(gid, true) + '</div><button type="button" class="md-x" data-act="drawer-close" aria-label="Schliessen">×</button></div>' +
       '<div class="dw-act">' + M.detailActions(gid, true) + '</div>' +
@@ -945,7 +978,7 @@
     var items = [];
     i.eins.forEach(function (e) { items.push({ d: e.von, k: 1, e: e }); });
     (I.wrt[gid] || []).forEach(function (w) { items.push({ d: w.datum, k: 2, w: w }); });
-    if (A.vor) items.push({ d: A.vorDatum, k: 3, vor: true });
+    if (A.vor && M.can('fin')) items.push({ d: A.vorDatum, k: 3, vor: true });
     if (g.kaufdatum) items.push({ d: g.kaufdatum, k: 4, kauf: true });
     items.sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : a.k - b.k; });
     var projs = {}; i.eins.forEach(function (e) { if (e.projektId && e.ort === 'feld') projs[e.projektId] = 1; });
@@ -968,7 +1001,7 @@
           '<button type="button" class="ic-btn" data-act="edit-einsatz" data-id="' + e.id + '" aria-label="Eintrag bearbeiten">✎</button></div>' +
           '<div class="hx-s">' + [p ? 'Projekt ' + esc(M.projName(p)) : (mag ? 'eingelagert' : 'ohne Projekt'),
             M.auftragOf(e) ? 'Auftrag ' + esc(M.auftragOf(e)) : '',
-            !mag ? (M.posRate(e) ? esc(M.posLabel(M.posRate(e).P)) : e.amortModus === 'monat' ? 'CHF ' + M.chf(e.amortBetrag) + ' pro Monat' : 'CHF ' + M.chf(e.amortBetrag) + ' pauschal') : '',
+            !mag && M.can('fin') ? (M.posRate(e) ? esc(M.posLabel(M.posRate(e).P)) : e.amortModus === 'monat' ? 'CHF ' + M.chf(e.amortBetrag) + ' pro Monat' : 'CHF ' + M.chf(e.amortBetrag) + ' pauschal') : '',
             lv ? '<span class="mono">LV95 ' + lv + '</span>' : '', who].filter(Boolean).join(' · ') + '</div></div></li>';
       } else if (it.w) {
         var w = it.w;
