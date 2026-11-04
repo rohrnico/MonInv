@@ -999,11 +999,24 @@
   };
 
   /* ================================================== EINSATZ */
+  /* Einsätze der anderen Geräte im selben Set (gleiche Offertposition und Einheit), je Gerät der passendste */
+  M.setSiblings = function (e) {
+    if (!e || !e.einheit) return [];
+    var I = M.idx(), by = {};
+    M.state.data.einsaetze.forEach(function (x) {
+      if (x.einheit !== e.einheit || x.geraetId === e.geraetId || (x.positionId || null) !== (e.positionId || null) || !I.ger[x.geraetId]) return;
+      var d = Math.abs(M.days(x.von, e.von)), cur = by[x.geraetId];
+      if (!cur || d < cur.d) by[x.geraetId] = { e: x, d: d };
+    });
+    return Object.keys(by).map(function (k) { return by[k].e; })
+      .sort(function (a, b) { return String(I.ger[a.geraetId].name).localeCompare(String(I.ger[b.geraetId].name), 'de', { numeric: true }); });
+  };
   M.openEinsatz = function (eid) {
     var e = M.state.data.einsaetze.find(function (x) { return x.id === eid; });
     if (!e) return;
     var g = M.idx().ger[e.geraetId];
-    M.ctx = { kind: 'einsatz', eid: eid };
+    var sibs = M.setSiblings(e);
+    M.ctx = { kind: 'einsatz', eid: eid, sibs: sibs.map(function (x) { return x.id; }) };
     var b = '<div class="mv-from">' + M.symbol(g.id, 32) + '<div><b>' + esc(g.name) + '</b><span>Einsatz korrigieren</span></div></div>' +
       locFields('el', e, { later: false, amort: { edit: true, modus: e.amortModus, betrag: e.amortBetrag } }) + '<div class="grid2">' +
       fld('Von', inp('e-von', e.von, 'type="date" required data-change="plan-in" data-p="el"')) +
@@ -1012,11 +1025,41 @@
       fld('Gesetzt von', inp('e-ges', e.gesetztVon, 'maxlength="40"')) +
       fld('Geholt von', inp('e-geh', e.geholtVon, 'maxlength="40"')) + '</div>' +
       fld('Bemerkung', '<textarea id="e-bem" rows="2">' + esc(e.bemerkung || '') + '</textarea>', 'full') +
+      (sibs.length ? setBox(e, sibs) : '') +
       '<p class="form-err" id="e-err" role="alert"></p>';
     M.modal({ title: 'Einsatz bearbeiten', form: 'einsatz', wide: true, body: b, foot: foot('Speichern', '<button type="button" class="btn ghost danger-t" data-act="e-del">Löschen</button>') });
   };
+  function setBox(e, sibs) {
+    var I = M.idx(), P = e.positionId ? I.pos[e.positionId] : null;
+    return '<fieldset class="extra set-apply"><legend>Set' + (P ? ' · ' + esc(M.posLabel(P)) : '') + '</legend>' +
+      '<label class="chk"><input type="checkbox" id="e-set-on" checked data-change="e-set-on"> <span><b>Änderungen auch für die anderen ' + sibs.length + (sibs.length === 1 ? ' Gerät' : ' Geräte') + ' im Set übernehmen</b></span></label>' +
+      '<div class="set-devs" id="e-set-devs">' + sibs.map(function (x) {
+        var g = I.ger[x.geraetId];
+        return '<label class="chk"><input type="checkbox" class="e-set-dev" value="' + x.id + '" checked> ' + M.symbol(g.id, 18) + ' <b>' + esc(g.name) + '</b> <span class="muted small">' + M.fmtDate(x.von) + ' – ' + (x.bis ? M.fmtDate(x.bis) : 'laufend') + '</span></label>';
+      }).join('') + '</div>' +
+      '<p class="muted small">Übernommen wird nur, was du hier änderst: Von, Bis, Standort/Projekt, Auftrag, Offertposition/Set, geplante Laufzeit, Gesetzt/Geholt von, Bemerkung. Die Position (LV95) bleibt je Gerät.</p></fieldset>';
+  }
+  /* geänderte Felder eines Einsatzes auf die Set-Geschwister übertragen; liefert Jobs und übersprungene Geräte */
+  var SET_FIELDS = ['von', 'bis', 'ort', 'magazinId', 'projektId', 'auftrag', 'positionId', 'einheit', 'amortModus', 'amortBetrag', 'planBis', 'planMonate', 'gesetztVon', 'geholtVon', 'bemerkung'];
+  M.applyToSet = function (orig, neu, sibIds) {
+    var I = M.idx(), jobs = [], skip = [], n = 0;
+    var changed = SET_FIELDS.filter(function (f) { return String(orig[f] === undefined || orig[f] === null ? '' : orig[f]) !== String(neu[f] === undefined || neu[f] === null ? '' : neu[f]); });
+    if (!changed.length) return { jobs: jobs, skip: skip, n: 0, changed: changed };
+    sibIds.forEach(function (sid) {
+      var x = M.state.data.einsaetze.find(function (y) { return y.id === sid; }); if (!x) return;
+      var c = M.copy(x), g = I.ger[x.geraetId];
+      changed.forEach(function (f) { c[f] = neu[f] === undefined ? null : neu[f]; });
+      if (changed.indexOf('planMonate') >= 0 || changed.indexOf('von') >= 0) { if (c.planMonate) c.planBis = M.addMonths(c.von, c.planMonate); }
+      if (c.ort !== 'feld') { c.lat = null; c.lng = null; c.ortName = ''; c.positionId = null; c.einheit = null; c.planBis = null; c.planMonate = null; }
+      if (c.bis && c.bis < c.von) { skip.push(g.name + ' («Bis» vor «Von»)'); return; }
+      if (!c.bis && M.state.data.einsaetze.some(function (y) { return y.geraetId === c.geraetId && !y.bis && y.id !== c.id; })) { skip.push(g.name + ' (hat schon einen laufenden Einsatz)'); return; }
+      jobs.push(M.put('einsaetze', c)); n++;
+    });
+    return { jobs: jobs, skip: skip, n: n, changed: changed };
+  };
   M.submitEinsatz = function () {
-    var e = M.copy(M.state.data.einsaetze.find(function (x) { return x.id === M.ctx.eid; }));
+    var orig = M.state.data.einsaetze.find(function (x) { return x.id === M.ctx.eid; });
+    var e = M.copy(orig);
     var r = readLoc('el');
     if (r.err) { $('e-err').textContent = r.err; return; }
     var moved = r.t.lat !== e.lat || r.t.lng !== e.lng;
@@ -1039,9 +1082,16 @@
     if (!e.bis && M.state.data.einsaetze.some(function (x) { return x.geraetId === e.geraetId && !x.bis && x.id !== e.id; })) {
       $('e-err').textContent = 'Das Gerät hat schon einen laufenden Einsatz. Bitte ein «Bis»-Datum setzen.'; return;
     }
+    var sibIds = $('e-set-on') && $('e-set-on').checked ? Array.prototype.map.call(document.querySelectorAll('.e-set-dev:checked'), function (el) { return el.value; }) : [];
+    var origCopy = M.copy(orig);
     M.put('einsaetze', e).then(function () {
       if (e.ort === 'feld' && M.has(e.lat) && !e.ortName) M.fillOrtName(e.id);
-      M.closeModal(); M.toast('Einsatz gespeichert'); M.refreshUI();
+      var r = sibIds.length ? M.applyToSet(origCopy, e, sibIds) : { jobs: [], skip: [], n: 0 };
+      return Promise.all(r.jobs).then(function () {
+        M.closeModal(); M.refreshUI();
+        M.toast('Einsatz gespeichert' + (r.n ? ' · ' + r.n + (r.n === 1 ? ' weiteres Gerät' : ' weitere Geräte') + ' im Set angepasst' : ''));
+        if (r.skip.length) M.toast('Nicht übernommen: ' + r.skip.join(', '), 'err');
+      });
     });
   };
 

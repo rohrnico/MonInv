@@ -1053,3 +1053,9 @@ form .posbox:not(:empty) { margin-top: 14px; }
 .g-bar.bad { box-shadow: inset 0 0 0 2px var(--signal); }
 .g-cnt { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 8px; background: var(--himmel); color: var(--blau); font: 700 10.5px/16px var(--f-head); }
 @media (max-width: 760px) { .ck-row { flex-direction: column; gap: 4px; } .ck-row > :first-child { flex: none; } }
+
+/* Einsatz bearbeiten: Änderung aufs ganze Set */
+.set-apply .set-devs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0 14px; max-height: 220px; overflow-y: auto; margin: 4px 0 6px 26px; }
+.set-apply .set-devs.off { opacity: .4; pointer-events: none; }
+.set-apply .set-devs .chk { white-space: normal; }
+@media (max-width: 760px) { .set-apply .set-devs { grid-template-columns: 1fr; margin-left: 0; } }

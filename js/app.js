@@ -701,6 +701,7 @@
       if (d.k === 'projekt' && el.value) setTimeout(M.mapFitAll, 50);
     },
     'invf': function (d, el) { M.state.filters.inv[d.k] = el.value; M.renderInventar(); },
+    'e-set-on': function (d, el) { var b = $('e-set-devs'); if (b) b.classList.toggle('off', !el.checked); },
     'user-role': function (d, el) { M.setRolle(d.mail, el.value).then(function () { M.toast(d.mail + ' ist jetzt ' + M.ROLLEN[el.value].name); }); },
     'inv-sel': function (d, el) { M.state.invSel[d.id] = el.checked; M.renderInventar(); },
     'inv-all': function (d, el) { (M.state.invVisible || []).forEach(function (id) { M.state.invSel[id] = el.checked; }); M.renderInventar(); },
