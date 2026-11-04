@@ -451,8 +451,8 @@
         '<td class="c-sym">' + M.symbol(g.id, child ? 20 : 24) + '</td>' +
         '<td class="c-name' + (child ? ' ms-indent' : '') + '"><button type="button" class="link-btn strong" data-act="open" data-id="' + g.id + '">' + esc(g.name) + '</button></td>' +
         '<td class="c-kat">' + esc(i.kat ? i.kat.name : M.typLabel[g.typ]) + '</td>' +
-        '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.mccTs ? 'bei ' + i.mccTs.name : child && i.msBei ? 'mit der Messstelle' : i.ortText) + '</td>' +
-        '<td class="c-proj' + (child || i.proj || i.res || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (child && i.msBei ? '' : i.proj ? esc(M.projName(i.proj)) : i.res ? '<span class="res-t">res. ' + esc(M.projName(i.res.proj)) + '</span>' : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
+        '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.mccTs ? 'bei ' + i.mccTs.name : i.ortText) + '</td>' +
+        '<td class="c-proj' + (child || i.proj || i.res || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (i.proj ? esc(M.projName(i.proj)) : i.res ? '<span class="res-t">res. ' + esc(M.projName(i.res.proj)) + '</span>' : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(g.hersteller || '') + '</td><td class="mono m-hide">' + esc(g.seriennummer || '') + '</td>' +
         '<td class="mono m-hide">' + M.fmtDate(g.kaufdatum) + '</td>' +
         '<td class="r mono m-hide fin">' + M.chf(g.wert) + '</td>' +
