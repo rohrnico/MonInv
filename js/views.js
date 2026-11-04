@@ -131,12 +131,13 @@
 
   function summaryHtml() {
     var all = geraete().filter(function (g) { return g.zustand !== 'ausgemustert' && g.typ !== 'messstelle'; });
-    var feld = 0, mag = 0, wart = [], ort = [], defekt = 0;
+    var feld = 0, mag = 0, wart = [], ort = [], abbau = [], defekt = 0;
     all.forEach(function (g) {
       var i = M.info(g.id);
       if (i.isMag) mag++; else if (i.cur) feld++;
       if (i.wart && i.wart.faellig) wart.push(i);
       if (i.ortFehlt) ort.push(i);
+      if (i.lz && i.lz.warn) abbau.push(i);
       if (g.zustand === 'defekt') defekt++;
     });
     function row(i, sub) {
@@ -148,6 +149,7 @@
     h += '<div class="tiles2"><div class="tile t-warn"><b>' + wart.length + '</b><span>Wartung fällig</span></div>' +
       '<div class="tile t-ort"><b>' + ort.length + '</b><span>Position fehlt</span></div></div>';
     if (wart.length) h += '<div class="sec-h"><span>Wartung fällig</span></div>' + wart.map(function (i) { return row(i, i.wart.tage + ' von ' + i.wart.limit + ' Tagen · ' + i.ortText); }).join('');
+    if (abbau.length) h += '<div class="sec-h"><span>Abbau fällig (Offertdauer erreicht)</span></div>' + abbau.map(function (i) { return row(i, (i.proj ? M.projName(i.proj) + ' · ' : '') + i.lz.off + ' Monate offeriert · Abbau ' + M.monatName(i.lz.abbau)); }).join('');
     if (ort.length) h += '<div class="sec-h"><span>Position fehlt</span></div>' + ort.map(function (i) { return row(i, (i.proj ? M.projName(i.proj) + ' · ' : '') + 'seit ' + M.fmtDate(i.cur.von)); }).join('');
     if (defekt) h += '<p class="muted small">' + defekt + ' Gerät' + (defekt > 1 ? 'e' : '') + ' als defekt markiert (in der Liste filterbar).</p>';
     h += '<p class="muted small">Symbol, Kreis oder Kabel antippen. Kreise fassen nahe Geräte zusammen und zeigen die Gruppen als Ring; der orange Punkt zählt den Handlungsbedarf. MCC im Einsatz stehen beim Tachymeter.</p></div>';
@@ -237,6 +239,22 @@
   function act(a, gid, k, label, cls) { return '<button type="button" class="pa-b' + (cls ? ' ' + cls : '') + '" data-act="' + a + '" data-id="' + gid + '">' + ico(k) + '<span>' + label + '</span></button>'; }
   M.ico = ico;
 
+  /* Laufzeit laut Offerte: Balken wie bei der Wartung, Abbaumonat, Hinweis mit Bestätigung */
+  function lzBox(gid, z) {
+    var mt = function (n) { return n + (n === 1 ? ' Monat' : ' Monate'); };
+    var wann = z.rest > 1 ? 'in ' + z.rest + ' Monaten' : z.rest === 1 ? 'nächsten Monat' : z.rest === 0 ? 'diesen Monat' : 'seit ' + (-z.rest === 1 ? '1 Monat' : (-z.rest) + ' Monaten') + ' überfällig';
+    var warn = z.warn, h = '<div class="wbox lzbox' + (warn ? ' due' : z.ok ? ' okd' : '') + '"><div class="wb-r"><b>' + (warn ? 'Abbau fällig – Offertdauer erreicht' : 'In Betrieb laut Offerte') + '</b><b class="mono">' + z.n + ' / ' + mt(z.off) + '</b></div>' +
+      '<div class="bar"><span style="width:' + Math.round(z.pct * 100) + '%"></span></div>' +
+      '<div class="wb-s">Abbau bis Ende <b>' + M.monatName(z.abbau) + '</b> · ' + wann + ' · Pos. ' + esc(z.P.nr || '?') + ': ' +
+      (z.set ? (z.nU > 1 ? z.offTotal + ' Monate für ' + z.nU + ' Sets = ' + mt(z.off) + ' pro Set' : mt(z.off) + ' für das Set') : mt(z.off) + ' pro Gerät') +
+      (z.ueber ? ' · ' + mt(z.ueber) + ' über der Offerte' : '') + '</div>';
+    if (warn) h += '<div class="wb-s">Die offerierte Dauer ist ' + (z.rest < 0 ? 'abgelaufen' : 'Ende Monat erreicht') + '. Gerät abbauen' + (z.set ? ' (ganzes Set)' : '') + ' oder bestätigen, dass es weiterläuft – dann verschwindet die Warnung.</div>' +
+      (M.can('edit') ? '<div class="wb-a"><button type="button" class="btn sm" data-act="move" data-id="' + gid + '">Abbauen …</button><button type="button" class="btn sm ghost" data-act="abbau-ok" data-id="' + gid + '">Weiterführen bestätigen</button></div>' : '');
+    else if (z.ok) h += '<div class="wb-s">Weiterführen bestätigt am ' + M.fmtDate(z.ok.datum) + (z.ok.wer ? ' von ' + esc(z.ok.wer) : '') +
+      (M.can('edit') ? ' · <button type="button" class="link-btn" data-act="abbau-undo" data-id="' + gid + '">zurücknehmen</button>' : '') + '</div>';
+    return h + '</div>';
+  }
+  M.lzBox = lzBox;
   /* kleines Etikett «bis 03.27» für die geplante Laufzeit (rot = überfällig) */
   M.planTag = function (e) {
     var p = M.planInfo(e); if (!p || !p.laufend) return '';
@@ -297,6 +315,7 @@
         '<div class="wb-s">Intervall ' + w.intervall + ' Monate · letzte Wartung ' + M.fmtDate(w.letzte) + ' · ' +
         (w.rest > 0 ? 'noch ' + w.rest + ' Tage' : 'überfällig seit ' + (-w.rest) + ' Tagen') + ' · Magazin zählt nicht</div></div>';
     }
+    if (i.lz) h += lzBox(gid, i.lz);
     if (i.ortFehlt) h += '<div class="hint warn">Die genaue Position fehlt.' + (i.posSrc === 'projekt' ? ' Das Symbol steht vorläufig an der Projektmitte.' : ' Ohne Position erscheint das Gerät nicht auf der Karte.') +
       ' <button type="button" class="link-btn" data-act="place" data-id="' + gid + '">Jetzt setzen</button></div>';
 

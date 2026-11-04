@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.7.2';
+  M.VERSION = '0.7.3';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -321,20 +321,22 @@
     var ortFehlt = !!(cur && !isMag && posSrc !== 'eigen' && !mccTs);
     var mccFehlt = g.typ === 'tachymeter' && !!cur && !isMag && !g.mccId && g.zustand !== 'defekt' && g.zustand !== 'ausgemustert';
 
+    var lz = cur && !isMag && g.typ !== 'messstelle' && g.zustand !== 'ausgemustert' ? M.laufzeitOffert(cur) : null;
+
     var state = 'ok';
     if (g.zustand === 'defekt' || g.zustand === 'ausgemustert') state = 'defekt';
     else if (wart && wart.faellig) state = 'wartung';
     else if (isMag) state = res ? 'reserviert' : 'magazin';
     else if (ortFehlt) state = 'ort';
     else if (mccFehlt) state = 'mcc';
-    var issue = state === 'wartung' || state === 'ort' || mccFehlt;
+    var issue = state === 'wartung' || state === 'ort' || mccFehlt || !!(lz && lz.warn);
 
     var info = {
       g: g, kat: kat, gruppe: gruppe, pikto: pikto, kuerzel: kat ? kat.kuerzel : '',
       cur: cur, proj: proj, mag: mag, isMag: isMag, res: res, pos: pos, posSrc: posSrc,
       ortText: cur ? M.ortText(cur) : 'ohne Standort',
       eins: eins, amortSum: amortSum, nProjekte: Object.keys(projSet).length, nStandorte: nStandorte, restwert: restwert, ertrag: ertrag,
-      wart: wart, state: state, issue: issue, ortFehlt: ortFehlt, mccFehlt: mccFehlt, mccTs: mccTs, members: members, ms: ms, msBei: msBei,
+      wart: wart, lz: lz, state: state, issue: issue, ortFehlt: ortFehlt, mccFehlt: mccFehlt, mccTs: mccTs, members: members, ms: ms, msBei: msBei,
       kabel: I.kabByGer[gid] || []
     };
     I.derived[gid] = info;
@@ -398,7 +400,7 @@
   };
   M.stateChip = function (gid) {
     var i = M.info(gid);
-    var s = i.g.zustand === 'ausgemustert' ? ['Ausgemustert', 'chip-off'] : M.stateLabel[i.state];
+    var s = i.g.zustand === 'ausgemustert' ? ['Ausgemustert', 'chip-off'] : i.state === 'ok' && i.lz && i.lz.warn ? ['Abbau fällig', 'chip-warn'] : M.stateLabel[i.state];
     return '<span class="chip ' + s[1] + '">' + s[0] + '</span>';
   };
   M.typLabel = { sensor: 'Sensor', tachymeter: 'Tachymeter', mcc: 'MCC TSC', messstelle: 'Messstelle' };
@@ -984,8 +986,8 @@
   function morgen() { return M.iso(new Date(new Date(M.today() + 'T00:00:00').getTime() + 86400000)); }
   M.MIN_TAGE = 10;   // mehr als so viele Tage im Kalendermonat = ganzer Monat, sonst 0
   /* Tage je Kalendermonat, die eine Liste von Zeiträumen [von, bis) abdeckt (Überlappungen zählen einmal) */
-  M.monatsTage = function (iv, abDatum) {
-    var end0 = morgen(), list = iv.map(function (x) { var a = x[0], b = x[1] && x[1] < end0 ? x[1] : end0; if (abDatum && a < abDatum) a = abDatum; return [a, b]; })
+  M.monatsTage = function (iv, abDatum, endDatum) {
+    var end0 = endDatum || morgen(), list = iv.map(function (x) { var a = x[0], b = x[1] && x[1] < end0 ? x[1] : end0; if (abDatum && a < abDatum) a = abDatum; return [a, b]; })
       .filter(function (x) { return x[0] < x[1]; }).sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
     var merged = [];
     list.forEach(function (x) { var l = merged[merged.length - 1]; if (l && x[0] <= l[1]) { if (x[1] > l[1]) l[1] = x[1]; } else merged.push([x[0], x[1]]); });
@@ -1001,8 +1003,8 @@
     });
     return out;   // { 'YYYY-MM': Tage }
   };
-  M.monatsAnteile = function (iv, abDatum) {   // { 'YYYY-MM': 0 | 1 }
-    var t = M.monatsTage(iv, abDatum), out = {};
+  M.monatsAnteile = function (iv, abDatum, endDatum) {   // { 'YYYY-MM': 0 | 1 }
+    var t = M.monatsTage(iv, abDatum, endDatum), out = {};
     Object.keys(t).forEach(function (mk) { out[mk] = t[mk] > M.MIN_TAGE ? 1 : 0; });
     return out;
   };
@@ -1052,6 +1054,42 @@
   M.unitLabel = function (P, u) {
     var I = M.idx(), names = u.devs.map(function (id) { return I.ger[id].name; });
     return (P.art === 'set' ? 'Set ' + u.nr + ' · ' : '') + names.slice(0, 3).join(' + ') + (names.length > 3 ? ' + ' + (names.length - 3) + ' weitere' : '');
+  };
+  M.MONATSNAMEN = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  M.monatName = function (mk) { return mk ? M.MONATSNAMEN[+mk.slice(5, 7) - 1] + ' ' + mk.slice(0, 4) : ''; };
+  /* Laufzeit laut Offerte für einen laufenden Einsatz: offerierte Monate der Einheit (Stückpreis: pro Gerät,
+     Set: Monate total ÷ Anzahl Sets), bisher abgerechnete Monate und der Monat, in dem abgebaut werden soll.
+     Abgerechnet wird pro Kalendermonat (mehr als 10 Tage = ganzer Monat) – der Abbaumonat ist der letzte offerierte. */
+  M.laufzeitOffert = function (e) {
+    var I = M.idx(), P = e && e.positionId && I.pos[e.positionId];
+    var off = P ? M.num(P.offMonate) || 0 : 0;
+    if (!off || e.bis || e.ort !== 'feld') return null;
+    var u = M.unitOf(e); if (!u) return null;
+    var nU = P.art === 'set' ? Math.max(1, M.posUnits(P.id).list.length) : 1;
+    var pro = P.art === 'set' ? Math.max(1, Math.round(off / nU)) : off;
+    var iv = u.eins.map(function (x) { return [x.von, x.bis]; });
+    var ist = M.monatsAnteile(iv), n = 0;
+    Object.keys(ist).forEach(function (k) { n += ist[k]; });
+    // Weiterlaufen angenommen: der pro-te abgerechnete Monat ist der Abbaumonat
+    var proj = M.monatsAnteile(iv, null, M.addDays(M.today(), (pro + 3) * 31));
+    var keys = Object.keys(proj).filter(function (k) { return proj[k]; }).sort(), abbau = keys[pro - 1] || null;
+    if (!abbau) return null;
+    var hm = M.today().slice(0, 7);
+    var rest = abbau >= hm ? M.monate(hm, abbau).length - 1 : -(M.monate(abbau, hm).length - 1);
+    var ok = null;
+    u.eins.forEach(function (x) { if (!x.bis && x.abbauOk && +x.abbauOk.monate === pro && !ok) ok = x.abbauOk; });
+    var faellig = rest <= 0;
+    return { P: P, u: u, off: pro, offTotal: off, nU: nU, set: P.art === 'set', n: n, pct: Math.min(1, n / pro), abbau: abbau, rest: rest,
+      faellig: faellig, ok: ok, warn: faellig && !ok, ueber: Math.max(0, n - pro) };
+  };
+  /* Abbau-Hinweis bestätigen: das Gerät (bzw. das ganze Set) läuft weiter, ohne Warnung – bis sich die Offertmonate ändern */
+  M.abbauBestaetigen = function (gid, zurueck) {
+    var i = M.info(gid), z = i.lz; if (!z) return Promise.resolve();
+    return Promise.all(z.u.eins.filter(function (x) { return !x.bis; }).map(function (x) {
+      var c = M.copy(x);
+      if (zurueck) delete c.abbauOk; else c.abbauOk = { monate: z.off, abbau: z.abbau, datum: M.today(), wer: M.userKuerzel() };
+      return M.put('einsaetze', c);
+    }));
   };
   M.posLabel = function (P) { return P ? 'Pos. ' + (P.nr || '?') + ' · ' + (P.text || '') : ''; };
   M.posPreis = function (P) { return (M.num(P.V) || 0) + (M.num(P.B) || 0) + (M.num(P.W) || 0); };

@@ -268,6 +268,10 @@ fieldset.loc .seg.full { margin-bottom: 12px; }
 .bar span { display: block; height: 100%; background: var(--blau); }
 .wbox.due .bar { background: #FBD8C1; } .wbox.due .bar span { background: var(--signal); }
 .wb-s { font-size: 12px; color: var(--stein); }
+.wb-s b { color: var(--tinte, inherit); font-weight: 700; }
+.wb-a { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.lzbox .bar span { background: var(--blau); }
+.lzbox.okd { border-color: #9CC7B0; } .lzbox.okd .bar span { background: #2E8B5E; }
 .attrs { display: flex; flex-direction: column; }
 .at { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--linie-2); font-size: 13.5px; }
 .at > span:first-child { width: 128px; flex: none; color: var(--stein); }

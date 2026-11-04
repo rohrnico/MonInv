@@ -490,6 +490,8 @@
       }, true);
     },
     'move': function (d) { M.openMove([d.id]); },
+    'abbau-ok': function (d) { M.abbauBestaetigen(d.id).then(function () { M.toast('Bestätigt – das Gerät läuft ohne Warnung weiter'); M.refreshUI(); }); },
+    'abbau-undo': function (d) { M.abbauBestaetigen(d.id, true).then(function () { M.toast('Bestätigung zurückgenommen'); M.refreshUI(); }); },
     'dup': function (d) { M.openDup(d.id); },
     'wartung': function (d) { M.openWartung(d.id); },
     'edit-wartung': function (d) { M.openWartung(null, d.id); },
