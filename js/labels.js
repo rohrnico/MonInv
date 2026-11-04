@@ -106,6 +106,7 @@
     var gpsSub = imFeld ? 'Position übernehmen' + (bi.proj ? ', Projekt bleibt' : '') : 'Projekt und Position wählen';
     var b = '<div class="sa-head">' + M.symbol(gid, 44) + '<div><b>' + esc(g.name) + '</b><span>' + esc(sub) + '</span>' +
       '<span class="sa-wo">' + wo + '</span>' + (ts ? '<span class="sa-ts">Gehört zu ' + esc(ts.name) + ' – Standort und Magazin gelten für beide.</span>' : '') + '</div></div>' +
+      (base.typ === 'tachymeter' ? saMcc(base) : '') +
       '<div class="sa-grid">' +
       '<button type="button" class="sa-btn" data-act="sa-gps" id="sa-gps">' + IC.gps + '<b>Hier platzieren</b><span>GPS · ' + gpsSub + '</span></button>' +
       '<button type="button" class="sa-btn" data-act="sa-mag"' + (bi.isMag ? ' disabled' : '') + '>' + IC.mag + '<b>Ins Magazin</b><span>' + (bi.isMag ? 'steht schon im Magazin' : 'zurückbuchen') + '</span></button>' +
@@ -114,6 +115,12 @@
     M.modal({ title: 'Gescannt', form: 'scanakt', body: b, noFocus: true,
       foot: '<button type="button" class="btn ghost" data-act="sa-show">Details anzeigen</button><span class="grow"></span><button type="button" class="btn ghost" data-act="modal-close">Schliessen</button>' });
   };
+  /* MCC des Tachymeters: anzeigen und per QR dazusetzen */
+  function saMcc(ts) {
+    var mcc = ts.mccId && M.idx().ger[ts.mccId], kann = M.can('edit');
+    return '<div class="sa-mcc' + (mcc ? '' : ' fehlt') + '">' + (mcc ? M.symbol(mcc.id, 28) : '') + '<span class="sa-mcc-t"><span>MCC TSC</span><b>' + (mcc ? esc(mcc.name) : 'noch keine – im Feld Pflicht') + '</b></span>' +
+      (kann ? '<button type="button" class="btn sm' + (mcc ? ' ghost' : '') + '" data-act="sa-mcc">' + (mcc ? 'Andere scannen' : 'MCC scannen') + '</button>' : '') + '</div>';
+  }
   function saGps() {
     var c = M.ctx; if (!c || c.kind !== 'scanakt') return;
     var base = c.base, bi = M.info(base), btn = $('sa-gps'), m = $('sa-msg');
@@ -124,7 +131,9 @@
       var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = Math.round(pos.coords.accuracy || 0);
       if (bi.cur && bi.cur.ort === 'feld') {
         M.closeModal();
+        var ohneMcc = M.idx().ger[base].typ === 'tachymeter' && !M.idx().ger[base].mccId;
         Promise.resolve(M.setPos(base, lat, lng)).then(function () {
+          if (ohneMcc) setTimeout(function () { M.toast('Noch keine MCC zugeordnet – Tachymeter nochmals scannen und «MCC scannen» wählen', 'err'); }, 900);
           M.refreshUI && M.refreshUI();
           M.go('karte', false); history.replaceState(null, '', '#karte');
           setTimeout(function () { M.select(base); M.mapFocus(base); }, 80);
@@ -324,10 +333,75 @@
   var scan = null;   // { stream, timer, mode, list, last }
   function stopScan() {
     if (!scan) return;
-    clearInterval(scan.timer);
-    if (scan.stream) scan.stream.getTracks().forEach(function (t) { t.stop(); });
+    if (scan.cam) scan.cam.stop();
     scan = null;
   }
+  /* Kamera starten und laufend nach QR-Codes suchen; liefert { stop } */
+  function camStart(v, onText, say) {
+    var h = { stopped: false, stream: null, timer: null };
+    h.stop = function () { h.stopped = true; clearInterval(h.timer); if (h.stream) h.stream.getTracks().forEach(function (t) { t.stop(); }); };
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { say(location.protocol === 'file:' ? 'Die Kamera geht nur, wenn die App über https läuft (nicht als lokale Datei). Code unten eingeben.' : 'Dieser Browser gibt keinen Zugriff auf die Kamera. Code unten eingeben.', true); return h; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (stream) {
+      if (h.stopped) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+      h.stream = stream;
+      v.srcObject = stream; v.play().catch(function () {});
+      say('QR-Code in den Rahmen halten');
+      return detector().then(function (det) {
+        if (h.stopped) return;
+        var busy = false;
+        h.timer = setInterval(function () {
+          if (busy || !v.videoWidth) return;
+          busy = true;
+          det(v).then(function (txt) { busy = false; if (txt && !h.stopped) onText(txt); }).catch(function () { busy = false; });
+        }, 220);
+      });
+    }).catch(function (e) {
+      if (h.stopped) return;
+      say(e && e.name === 'NotAllowedError' ? 'Kein Zugriff auf die Kamera. In den Browser-Einstellungen erlauben oder den Code unten eingeben.' : 'Kamera nicht verfügbar (' + (e && e.message || e) + '). Code unten eingeben.', true);
+    });
+    return h;
+  }
+
+  /* ---------- Ein Gerät per QR wählen, ohne den offenen Dialog zu schliessen (z.B. MCC zum Tachymeter) */
+  var pick = null;   // { cam, o }
+  function pickClose() {
+    if (!pick) return;
+    if (pick.cam) pick.cam.stop();
+    var el = $('scanpick'); if (el) el.remove();
+    document.removeEventListener('keydown', pickKey, true);
+    pick = null;
+  }
+  function pickKey(e) { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); pickClose(); } }
+  function pickMsg(t, err) { var m = $('sp-msg'); if (m) { m.textContent = t; m.classList.toggle('err', !!err); } }
+  function pickCode(txt) {
+    if (!pick) return;
+    var g = M.findByCode(txt), o = pick.o;
+    if (!g) { pickMsg('Unbekannter Code: ' + String(txt).slice(0, 50), true); return; }
+    if (o.typ && g.typ !== o.typ) { pickMsg(g.name + ' ist ' + (o.typ === 'mcc' ? 'keine MCC TSC' : 'nicht passend') + ' – bitte ' + (o.was || 'das richtige Etikett') + ' scannen.', true); return; }
+    if (navigator.vibrate) navigator.vibrate(60);
+    pickClose();
+    o.onPick(g);
+  }
+  M.scanPick = function (o) {
+    pickClose();
+    var el = document.createElement('div');
+    el.id = 'scanpick'; el.className = 'sp-ov';
+    el.innerHTML = '<div class="sp-box" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '"><div class="sp-h"><b>' + esc(o.title) + '</b><button type="button" class="md-x" data-act="sp-close" aria-label="Schliessen">×</button></div>' +
+      (o.hint ? '<p class="muted small sp-hint">' + o.hint + '</p>' : '') +
+      '<div class="sc-cam"><video id="sp-video" playsinline muted></video><div class="sc-frame" aria-hidden="true"></div><p class="sc-msg" id="sp-msg" aria-live="polite">Kamera wird gestartet …</p></div>' +
+      '<label class="fld sc-manual"><span>Oder Code / Name eingeben</span><span class="row-in"><input id="sp-code" autocomplete="off" placeholder="z.B. MCC618160009" data-enter="sp-manual"><button type="button" class="btn ghost sm" data-act="sp-manual">Übernehmen</button></span></label></div>';
+    document.body.appendChild(el);
+    document.addEventListener('keydown', pickKey, true);
+    pick = { o: o };
+    pick.cam = camStart($('sp-video'), pickCode, pickMsg);
+  };
+
+  /* MCC einem Tachymeter zuordnen; hängt sie noch an einem anderen Tachymeter, wird sie dort gelöst */
+  M.mccZuordnen = function (tsId, mccId) {
+    var I = M.idx(), alt = I.tsOfMcc[mccId] && I.tsOfMcc[mccId] !== tsId ? I.ger[I.tsOfMcc[mccId]] : null;
+    var pre = alt ? M.put('geraete', Object.assign(M.copy(alt), { mccId: null })) : Promise.resolve();
+    return pre.then(function () { return M.setMcc(tsId, mccId); }).then(function () { return { alt: alt }; });
+  };
   var origClose = M.closeModal;
   M.closeModal = function () { stopScan(); origClose(); };
 
@@ -342,30 +416,9 @@
     M.modal({ title: 'QR-Etikett scannen', form: 'scan', body: b, noFocus: true, foot: '<span class="grow"></span><button type="button" class="btn ghost" data-act="modal-close">Schliessen</button>' });
     scan = { mode: 'open', list: [], last: {} };
     if (mode === 'multi') setScanMode('multi');
-    startCam();
+    scan.cam = camStart($('sc-video'), onCode, msg);
   };
   function msg(t, err) { var m = $('sc-msg'); if (m) { m.textContent = t; m.classList.toggle('err', !!err); } }
-  function startCam() {
-    var s = scan;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg(location.protocol === 'file:' ? 'Die Kamera geht nur, wenn die App über https läuft (nicht als lokale Datei). Code unten eingeben.' : 'Dieser Browser gibt keinen Zugriff auf die Kamera. Code unten eingeben.', true); return; }
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (stream) {
-      if (scan !== s) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
-      s.stream = stream;
-      var v = $('sc-video'); v.srcObject = stream; v.play().catch(function () {});
-      msg('QR-Code in den Rahmen halten');
-      return detector().then(function (det) {
-        if (scan !== s) return;
-        var busy = false;
-        s.timer = setInterval(function () {
-          if (busy || !v.videoWidth) return;
-          busy = true;
-          det(v).then(function (txt) { busy = false; if (txt) onCode(txt); }).catch(function () { busy = false; });
-        }, 220);
-      });
-    }).catch(function (e) {
-      msg(e && e.name === 'NotAllowedError' ? 'Kein Zugriff auf die Kamera. In den Browser-Einstellungen erlauben oder den Code unten eingeben.' : 'Kamera nicht verfügbar (' + (e && e.message || e) + '). Code unten eingeben.', true);
-    });
-  }
   /* liefert eine Funktion video → Promise<Text|null>; nativ (BarcodeDetector) oder jsQR */
   function detector() {
     if ('BarcodeDetector' in window) {
@@ -448,6 +501,37 @@
       scan ? (delete scan.last[g.qr || g.id], onCode(g.qr || g.id)) : M.openCode(g.qr || g.id);
     },
     'sa-gps': function () { saGps(); },
+    'sa-mcc': function () {
+      var c = M.ctx; if (!c || c.kind !== 'scanakt') return;
+      var gid = c.gid, base = c.base;
+      M.scanPick({ title: 'MCC TSC scannen', typ: 'mcc', was: 'das Etikett der MCC', hint: 'Für ' + esc(M.idx().ger[base].name) + '. Die MCC wechselt danach den Standort mit dem Tachymeter.', onPick: function (g) {
+        M.mccZuordnen(base, g.id).then(function (r) {
+          M.toast(g.name + ' gehört jetzt zu ' + M.idx().ger[base].name + (r.alt ? ' (von ' + r.alt.name + ' gelöst)' : ''));
+          M.refreshUI && M.refreshUI();
+          if (M.ctx && M.ctx.kind === 'scanakt') M.openScanAktionen(gid);
+        }).catch(function (e) { M.toast('MCC nicht gespeichert: ' + (e.message || e), 'err'); });
+      } });
+    },
+    /* MCC-Auswahlfeld (Projekt ändern, Gerät bearbeiten) per QR füllen */
+    'mcc-scan': function (d) {
+      var sel = $(d.k); if (!sel) return;
+      M.scanPick({ title: 'MCC TSC scannen', typ: 'mcc', was: 'das Etikett der MCC', onPick: function (g) {
+        if (!sel.isConnected) return;
+        var I = M.idx(), alt = I.tsOfMcc[g.id] && I.tsOfMcc[g.id] !== d.id ? I.ger[I.tsOfMcc[g.id]] : null;
+        if (![].some.call(sel.options, function (o) { return o.value === g.id; })) {
+          var o = document.createElement('option'); o.value = g.id; o.textContent = g.name + (alt ? ' · wird von ' + alt.name + ' gelöst' : ''); sel.appendChild(o);
+        }
+        sel.value = g.id;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        M.toast(g.name + ' gewählt' + (alt ? ' – wird beim Speichern von ' + alt.name + ' gelöst' : ''));
+      } });
+    },
+    'sp-close': function () { pickClose(); },
+    'sp-manual': function () {
+      var v = ($('sp-code') || {}).value || ''; if (!v.trim()) return;
+      var g = M.findByCode(v); if (!g) { pickMsg('Nichts gefunden für «' + v.trim() + '»', true); return; }
+      pickCode(g.qr || g.id);
+    },
     'sa-mag': function () { var c = M.ctx; if (c && c.kind === 'scanakt') M.openMove([c.base], true); },
     'sa-edit': function () { var c = M.ctx; if (c && c.kind === 'scanakt') M.openGeraet(c.gid); },
     'sa-show': function () { var c = M.ctx; if (c && c.kind === 'scanakt') { var id = c.gid; M.closeModal(); M.showDevice(id); } },

@@ -302,8 +302,9 @@
     var I = M.idx();
     var mccs = M.state.data.geraete.filter(function (x) { return x.typ === 'mcc' && x.zustand !== 'ausgemustert' && (!I.tsOfMcc[x.id] || I.tsOfMcc[x.id] === tsId); })
       .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de', { numeric: true }); });
-    return fld('MCC TSC · Pflicht im Feld', '<select id="' + id + '">' + opt('', mccs.length ? '– bitte wählen –' : 'keine freie MCC erfasst', !sel) +
-      mccs.map(function (m) { return opt(m.id, m.name + ' · ' + M.info(m.id).ortText, sel === m.id); }).join('') + '</select>');
+    return fld('MCC TSC · Pflicht im Feld', '<span class="row-in mcc-in"><select id="' + id + '">' + opt('', mccs.length ? '– bitte wählen –' : 'keine freie MCC erfasst', !sel) +
+      mccs.map(function (m) { return opt(m.id, m.name + ' · ' + M.info(m.id).ortText, sel === m.id); }).join('') + '</select>' +
+      '<button type="button" class="btn sm ghost qr-btn" data-act="mcc-scan" data-k="' + id + '" data-id="' + esc(tsId || '') + '" title="MCC per QR-Etikett wählen">' + M.ico('scan') + '<span>QR</span></button></span>');
   }
   M.mccSelect = mccSelect;
 
@@ -518,7 +519,9 @@
     var isNew = !c.gid;
     if (isNew) d.id = M.uid('ger');
     var prevMcc = c.gid ? M.idx().ger[c.gid].mccId : null;
+    var altTs = d.typ === 'tachymeter' && d.mccId && M.idx().tsOfMcc[d.mccId] && M.idx().tsOfMcc[d.mccId] !== d.id ? M.idx().ger[M.idx().tsOfMcc[d.mccId]] : null;
     var jobs = [M.put('geraete', d)];
+    if (altTs) jobs.push(M.put('geraete', Object.assign(M.copy(altTs), { mccId: null })));
     if (isNew) jobs.push(M.move(d.id, loc.t, von));
     // neu zugeordnete MCC an den Standort des Tachymeters holen
     if (!isNew && d.typ === 'tachymeter' && d.mccId && d.mccId !== prevMcc) jobs.push(M.mccFollow(d.id, d.mccId));
@@ -555,7 +558,8 @@
     M.ctx = { kind: 'mccpick', tsId: tsId };
     var mccs = M.state.data.geraete.filter(function (x) { return x.typ === 'mcc' && x.zustand !== 'ausgemustert' && (!I.tsOfMcc[x.id] || I.tsOfMcc[x.id] === tsId); });
     var b = '<div class="mv-from">' + M.symbol(tsId, 32) + '<div><b>' + esc(t.name) + '</b><span>' + esc(M.info(tsId).ortText) + '</span></div></div>' +
-      fld('MCC TSC', '<select id="mp-mcc">' + opt('', 'keine', !t.mccId) + mccs.map(function (m) { return opt(m.id, m.name + ' · ' + M.info(m.id).ortText, t.mccId === m.id); }).join('') + '</select>') +
+      fld('MCC TSC', '<span class="row-in mcc-in"><select id="mp-mcc">' + opt('', 'keine', !t.mccId) + mccs.map(function (m) { return opt(m.id, m.name + ' · ' + M.info(m.id).ortText, t.mccId === m.id); }).join('') + '</select>' +
+        '<button type="button" class="btn sm ghost qr-btn" data-act="mcc-scan" data-k="mp-mcc" data-id="' + esc(tsId) + '" title="MCC per QR-Etikett wählen">' + M.ico('qr') + '<span>QR</span></button></span>') +
       '<p class="muted small">Die MCC wechselt den Standort mit ihrem Tachymeter und erscheint nicht separat auf der Karte.</p>';
     M.modal({ title: 'MCC zuordnen', form: 'mccpick', body: b, foot: foot('Speichern') });
   };
@@ -853,7 +857,7 @@
       var mid = val('mv-mcc-sel');
       if (!mid) { $('mv-err').textContent = 'Ein Tachymeter im Feld braucht eine MCC TSC. Bitte wählen.'; return; }
       var ts = M.copy(M.idx().ger[c.gids[0]]);
-      if (ts.mccId !== mid) { ts.mccId = mid; pre = M.put('geraete', ts); }
+      if (ts.mccId !== mid) { pre = M.mccZuordnen ? M.mccZuordnen(ts.id, mid) : (ts.mccId = mid, M.put('geraete', ts)); }
     }
     var per = r.t.positionId ? null : $('mv-ascope') ? amortPer('mv', c.n) : (M.has(r.t.amortBetrag) ? r.t.amortBetrag : null);
     var jobs = [pre.then(function () {
@@ -1455,7 +1459,7 @@
     else if (f === 'csvimp') M.submitCsvImport();
     else if (f === 'mccpick') {
       var ts = M.ctx.tsId;
-      M.setMcc(ts, val('mp-mcc')).then(function () { M.closeModal(); M.toast('MCC-Zuordnung gespeichert'); M.refreshUI(); });
+      (val('mp-mcc') && M.mccZuordnen ? M.mccZuordnen(ts, val('mp-mcc')) : M.setMcc(ts, val('mp-mcc'))).then(function () { M.closeModal(); M.toast('MCC-Zuordnung gespeichert'); M.refreshUI(); });
     }
     else if (f === 'confirm') {
       var fn = M.ctx && M.ctx.confirm;
