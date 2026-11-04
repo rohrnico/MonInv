@@ -119,7 +119,10 @@
       var h = Object.assign({ Authorization: 'Bearer ' + token }, headers || {});
       return fetch(url.indexOf('http') === 0 ? url : GRAPH + url, { method: method, headers: h, body: body });
     }).then(function (res) {
-      if (!res.ok) return res.text().then(function (t) { var e = new Error('SharePoint-Datei: HTTP ' + res.status + ' ' + t.slice(0, 160)); e.status = res.status; throw e; });
+      if (!res.ok) return res.text().then(function (t) {
+        var m = ''; try { var j = JSON.parse(t); m = j && j.error && j.error.message ? j.error.message : ''; } catch (x) { m = t.slice(0, 160); }
+        var e = new Error('SharePoint-Datei: ' + (res.status === 403 ? 'keine Berechtigung (403)' : res.status === 404 ? 'nicht gefunden (404)' : 'HTTP ' + res.status) + (m ? ' – ' + m : '')); e.status = res.status; throw e;
+      });
       return res;
     });
   };
@@ -129,7 +132,7 @@
     return this._graph('GET', '/sites/' + this.siteId + '/drive?$select=id').then(function (d) { self.driveId = d.id; return d.id; });
   };
   /* Dateien liegen in der Dokumentbibliothek der Website: MonInv-Dateien/Projekte/<Projekt>/… bzw. …/Geräte/<Gerät>/… */
-  function clean(s) { return String(s || '').replace(/[\\/:*?"<>|#%~&{}]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Ohne Namen'; }
+  function clean(s) { return String(s || '').replace(/'/g, '’').replace(/[\\/:*?"<>|#%~&{}]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Ohne Namen'; }
   SharePointStore.prototype.putBlob = function (id, name, blob, sub) {
     var self = this, folder = this.cfg.dateienOrdner || 'MonInv-Dateien';
     var safe = clean(name).slice(-120);
@@ -153,6 +156,29 @@
         return part(0);
       });
     }).then(function (item) { return { itemId: item.id, webUrl: item.webUrl, path: parts.join('/') }; });
+  };
+  /* Datei anzeigen, ohne sie per fetch zu laden (SharePoint-Downloads sind für fremde Websites gesperrt):
+     Bilder über ein grosses Vorschaubild, PDF und Office über die eingebettete SharePoint-Vorschau. */
+  SharePointStore.prototype.fileView = function (f) {
+    var self = this, ref = f.ref || {};
+    if (!ref.itemId) return Promise.reject(Object.assign(new Error('Diese Datei wurde im Testbetrieb hochgeladen und liegt nur im damaligen Browser – in SharePoint gibt es nur den Eintrag. Bitte die Datei neu hochladen.'), { fehlt: true }));
+    var bild = /^image\//.test(f.mime || '') || /\.(jpe?g|png|gif|webp|heic)$/i.test(f.name || '');
+    return this._drive().then(function (drive) {
+      var base = '/drives/' + drive + '/items/' + ref.itemId;
+      return self._graph('GET', base).then(function (it) {
+        var out = { webUrl: it.webUrl || ref.webUrl, download: it['@microsoft.graph.downloadUrl'] || null };
+        if (bild) {
+          return self._graph('GET', base + '/thumbnails?$select=large').then(function (t) {
+            var v = t && t.value && t.value[0]; out.img = v && v.large ? v.large.url : out.download; return out;
+          }).catch(function () { out.img = out.download; return out; });
+        }
+        return self._graph('POST', base + '/preview', {}).then(function (p) { out.embed = p && p.getUrl ? p.getUrl : null; return out; })
+          .catch(function () { return out; });
+      }, function (e) {
+        if (e.status === 404) throw Object.assign(new Error('Die Datei ist in SharePoint nicht mehr vorhanden (gelöscht oder verschoben). Bitte neu hochladen.'), { fehlt: true });
+        throw e;
+      });
+    });
   };
   SharePointStore.prototype.getBlob = function (ref) {
     var self = this;

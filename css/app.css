@@ -667,7 +667,7 @@ td.ms-indent::before { content: ""; position: absolute; left: 20px; top: 0; bott
 .dz-t { flex: 1 1 220px; font-size: 14px; }
 .dz-art select { height: 36px; }
 .dz-prog { font: 600 13px var(--f-mono); color: var(--blau); }
-.file-in { position: relative; overflow: hidden; cursor: pointer; display: inline-block; }
+.file-in { position: relative; overflow: hidden; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .file-in input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .fg { margin-bottom: 18px; }
 .fg-h { font: 700 13px var(--f-head); margin-bottom: 8px; }

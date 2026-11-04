@@ -127,10 +127,33 @@
     M.closeViewer();
     var v = document.createElement('div');
     v.id = 'viewer'; v.className = 'vw';
-    v.innerHTML = '<div class="vw-bar"><b class="vw-t">Lädt …</b><span class="grow"></span><button type="button" class="btn sm ghost-inv" data-act="viewer-tab">In neuem Tab</button><a class="btn sm ghost-inv" id="vw-dl" download>Herunterladen</a><button type="button" class="md-x vw-x" data-act="viewer-close" aria-label="Schliessen">×</button></div><div class="vw-b"><div class="vw-load"><span class="spin"></span></div></div>';
+    v.innerHTML = '<div class="vw-bar"><b class="vw-t">Lädt …</b><span class="grow"></span><button type="button" class="btn sm ghost-inv" data-act="viewer-tab">In neuem Tab</button><a class="btn sm ghost-inv" id="vw-dl" download>Herunterladen</a>' + (M.can('edit') ? '<label class="btn sm ghost-inv file-in" title="Datei durch eine neue Version ersetzen">Ersetzen<input type="file" data-change="file-reup" data-id="' + M.esc(fid) + '"></label>' : '') + '<button type="button" class="md-x vw-x" data-act="viewer-close" aria-label="Schliessen">×</button></div><div class="vw-b"><div class="vw-load"><span class="spin"></span></div></div>';
     document.body.appendChild(v);
     document.body.classList.add('viewer-open');
     requestAnimationFrame(function () { v.classList.add('in'); });
+    var f0 = (M.state.data.dateien || []).find(function (x) { return x.id === fid; });
+    var fail = function (e) {
+      var b = v.querySelector('.vw-b'); if (!b) return;
+      b.innerHTML = '<div class="vw-none"><p>' + M.esc(e.message || String(e)) + '</p>' +
+        (M.can('edit') ? '<label class="btn file-in">Neu hochladen<input type="file" data-change="file-reup" data-id="' + M.esc(fid) + '"></label>' : '') +
+        (f0 && f0.ref && f0.ref.webUrl && !e.fehlt ? '<a class="btn" href="' + M.esc(f0.ref.webUrl) + '" target="_blank" rel="noopener">In SharePoint öffnen</a>' : '') + '</div>';
+    };
+    // SharePoint: Vorschau von SharePoint einbetten (kein Download per fetch nötig)
+    if (f0 && M.store.fileView && M.store.mode === 'sharepoint') {
+      v.querySelector('.vw-t').textContent = f0.name;
+      M.store.fileView(f0).then(function (r) {
+        if (!$('viewer')) return;
+        M.viewerExt = r.webUrl || null;
+        var dl = $('vw-dl'); if (r.download) { dl.href = r.download; dl.removeAttribute('target'); } else if (r.webUrl) { dl.href = r.webUrl; dl.target = '_blank'; } else dl.hidden = true;
+        var b = v.querySelector('.vw-b');
+        if (r.img) b.innerHTML = '<div class="vw-img"><img src="' + M.esc(r.img) + '" alt="' + M.esc(f0.name) + '"></div>';
+        else if (r.embed) b.innerHTML = '<iframe class="vw-pdf" src="' + M.esc(r.embed) + '" title="' + M.esc(f0.name) + '" allow="fullscreen"></iframe>';
+        else b.innerHTML = '<div class="vw-none"><p>Für diese Datei gibt es keine Vorschau.</p>' + (r.webUrl ? '<a class="btn" href="' + M.esc(r.webUrl) + '" target="_blank" rel="noopener">In SharePoint öffnen</a>' : '') + '</div>';
+        var img = b.querySelector('.vw-img');
+        if (img) img.addEventListener('click', function () { img.classList.toggle('zoom'); });
+      }).catch(fail);
+      return;
+    }
     M.fileBlob(fid).then(function (r) {
       if (!$('viewer')) return;
       var url = M.viewerUrl = URL.createObjectURL(r.blob);
@@ -142,16 +165,13 @@
       else b.innerHTML = '<div class="vw-none"><p>Für diese Datei gibt es keine Vorschau.</p><a class="btn" href="' + url + '" download="' + M.esc(r.f.name) + '">Herunterladen</a></div>';
       var img = b.querySelector('.vw-img');
       if (img) img.addEventListener('click', function () { img.classList.toggle('zoom'); });
-    }).catch(function (e) {
-      var b = v.querySelector('.vw-b'); if (!b) return;
-      b.innerHTML = '<div class="vw-none"><p>' + M.esc(e.message || String(e)) + '</p>' +
-        (e.fehlt && M.can('edit') ? '<label class="btn file-in">Neu hochladen<input type="file" data-change="file-reup" data-id="' + M.esc(fid) + '"></label>' : '') + '</div>';
-    });
+    }).catch(fail);
   };
   M.closeViewer = function () {
     var v = $('viewer'); if (v) v.remove();
     document.body.classList.remove('viewer-open');
     if (M.viewerUrl) { URL.revokeObjectURL(M.viewerUrl); M.viewerUrl = null; }
+    M.viewerExt = null;
   };
 
   /* ---------- Platzieren */
@@ -413,7 +433,7 @@
     },
     'dw-files': function (d) { M.openDrawer(d.id, 'dateien'); },
     'viewer-close': function () { M.closeViewer(); },
-    'viewer-tab': function () { if (M.viewerUrl) window.open(M.viewerUrl, '_blank', 'noopener'); },
+    'viewer-tab': function () { var u = M.viewerExt || M.viewerUrl; if (u) window.open(u, '_blank', 'noopener'); },
     'open-any': function (d) { if (M.state.drawer) M.openDrawer(d.id); else M.open(d.id); },
     'amort-scope': function (d) { M.amortSetScope(d.p, d.k); },
     'abr-q': function (d) {
@@ -719,7 +739,7 @@
     'file-reup': function (d, el) {
       var file = el.files && el.files[0]; if (!file) return;
       M.toast('Datei wird hochgeladen …');
-      M.reuploadFile(d.id, file).then(function () { M.toast('Datei neu hochgeladen'); M.refreshUI(); }).catch(function (e) { M.toast('Hochladen fehlgeschlagen: ' + (e.message || e), 'err'); });
+      M.reuploadFile(d.id, file).then(function () { M.toast('Datei neu hochgeladen'); M.refreshUI(); if ($('viewer')) M.openViewer(d.id); }).catch(function (e) { M.toast('Hochladen fehlgeschlagen: ' + (e.message || e), 'err'); });
     },
     'user-role': function (d, el) { M.setRolle(d.mail, el.value).then(function () { M.toast(d.mail + ' ist jetzt ' + M.ROLLEN[el.value].name); }); },
     'inv-sel': function (d, el) { M.state.invSel[d.id] = el.checked; M.renderInventar(); },

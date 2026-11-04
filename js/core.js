@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.7.0';
+  M.VERSION = '0.7.1';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -1204,6 +1204,8 @@
     if (!f || !file) return Promise.resolve();
     return thumbOf(file).then(function (thumb) {
       return M.store.putBlob(f.id, file.name, file, M.fileFolder(f.ziel, f.zielId)).then(function (ref) {
+        var alt = f.ref;
+        if (alt && alt.itemId && alt.itemId !== ref.itemId && M.store.removeBlob) M.store.removeBlob(alt).catch(function () {});
         var c = M.copy(f); c.ref = ref; c.name = file.name; c.mime = file.type || c.mime; c.groesse = file.size; if (thumb) c.thumb = thumb; c.datum = M.today(); c.wer = M.userKuerzel();
         return M.put('dateien', c);
       });
