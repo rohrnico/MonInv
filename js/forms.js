@@ -1038,7 +1038,6 @@
     b += '</fieldset>' + fld('Bemerkung', '<textarea id="po-bem" rows="2">' + esc(d.bemerkung || '') + '</textarea>') + '<p class="form-err" id="po-err" role="alert"></p>';
     M.modal({ title: (P ? 'Position ' + (P.nr || '') : 'Neue Position') + ' · ' + M.projName(proj), form: 'position', wide: true, body: b, noFocus: !!P,
       foot: (P ? '<button type="button" class="btn ghost danger-t" data-act="pos-del" data-id="' + P.id + '">Position löschen</button>' : '') + '<span class="grow"></span><button type="button" class="btn ghost" data-act="modal-close">Abbrechen</button><button type="submit" class="btn">Speichern</button>' });
-    M.posRicht();
   };
   function nextNr(ps) {
     var last = ps.map(function (x) { return x.nr || ''; }).sort(function (a, b) { return a.localeCompare(b, 'de', { numeric: true }); }).pop();
@@ -1046,8 +1045,6 @@
     var m = String(last).match(/^(.*?)(\d+)$/);
     return m ? m[1] + (+m[2] + 1) : last + '.1';
   }
-  /* Richtwert Vorhalten: Anschaffungswert ÷ 36 Monate (Set: Summe, Stück: Durchschnitt) */
-  M.posRicht = function () { /* Richtwert entfällt */ };
   M.submitPosition = function () {
     var c = M.ctx, I = M.idx();
     var d = c.pid ? M.copy(I.pos[c.pid]) : { id: M.uid('pos'), projektId: c.projektId };

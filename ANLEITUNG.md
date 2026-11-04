@@ -166,7 +166,7 @@ In der Zeitachse eines Projekts hat jedes Gerät eine Zeile; mehrere Einsätze i
 
 ## 4. Erweitern
 
-**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.6.11**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.6.11`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
+**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.6.12**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.6.12`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
 
 
 **Neue Attribute ohne Programmieren:** Einstellungen › Kategorien › Kategorie öffnen › **Zusatzfelder** (Text, Zahl, Datum). Die Felder erscheinen sofort in der Maske, im Detail und im Excel-Export.
@@ -194,6 +194,7 @@ js/views.js         Ansichten (Karte, Inventar, Tachymeter, Projekte, Einstellun
 js/forms.js         Masken
 js/app.js           Start, Navigation, Export/Import
 js/mobile.js        Handy: Kartenblatt (Tippen/Wischen), Kartenränder, Tastatur
+js/motion.js        Bewegung: Ansichtswechsel, Listen, Kennzahlen, weiches Schliessen
 js/beispiel.js      Beispieldaten für den Testbetrieb
 vendor/             Leaflet 1.9.4, Leaflet.markercluster 1.5.3, MSAL Browser 2.39.0,
                     jsPDF 2.5.1, qrcode-generator 1.4.4, jsQR 1.4.0, Schrift Exo 2 ExtraBold (fonts/)

@@ -444,7 +444,6 @@
       document.querySelectorAll('[data-act=po-art]').forEach(function (b) { var on = b.getAttribute('data-k') === d.k; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
       var sb = $('po-setbox'); if (sb) sb.hidden = d.k !== 'set';
       $('po-preislbl').textContent = 'Preis pro ' + (d.k === 'set' ? 'Set' : 'Gerät') + ' und Monat (Offerte)';
-      M.posRicht();
     },
     'plan-mode': function (d) { M.planSetMode(d.p, d.k); },
     'bulk-plan': function () { M.openLaufzeit(selectedIds()); },
@@ -665,7 +664,6 @@
   };
 
   var CHANGE = {
-    'po-dev': function () { M.posRicht(); },
     'plan-in': function (d) { M.planInfoUpdate(d.p); },
     'loc-proj': function (d, el) {
       if (el.value === M.NEU_PROJ) { M.newProjShow(d.p, true); return; }
@@ -882,7 +880,7 @@
     document.title = 'MonInv ' + M.VERSION + ' · Monitoring-Inventar';
     M.store.init().then(function () { return M.store.load(); }).then(function (data) {
       M.setData(data);
-      $('loading').hidden = true;
+      if (M.hideLoading) M.hideLoading(); else $('loading').hidden = true;
       var v = location.hash.slice(1);
       M.go(VIEWS.indexOf(v) >= 0 ? v : 'karte', false);
       if (M.pendingOpen) setTimeout(M.pendingOpen, 80);   // Link aus einem QR-Etikett
