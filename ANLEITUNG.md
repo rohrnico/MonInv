@@ -100,6 +100,12 @@ Der lokale Testmodus hat keine Anmeldung; die Daten liegen dort nur im eigenen B
 - **Schutz:** Die App blendet die Finanzbereiche für User aus und sperrt fürs Sekretariat jedes Ändern. Wer die SharePoint-Listen direkt öffnet, sieht aber, was SharePoint erlaubt. Darum dem Sekretariat in der Website «Monitoring» nur **Lesen** geben (Gruppe «Besucher») – dann sperrt auch SharePoint jedes Ändern. Für einen echten Schutz der Finanzzahlen vor Usern müssten sie in eine eigene Liste mit eigenen Berechtigungen (möglicher Ausbau).
 - Im lokalen Testbetrieb ist man immer Admin.
 
+### Datenprüfung
+
+**Einstellungen › Datenprüfung** (nur Admin) findet Geräte, deren Einsätze sich zeitlich überschneiden – z.B. zweimal «laufend» nach einem doppelten Import oder gleichzeitigem Speichern auf zwei Geräten. Solche Geräte erscheinen im Projekt doppelt und könnten doppelt abgerechnet werden; im Projekt steht dann ein Hinweis. **Bereinigen** führt exakte Doppel (gleicher Beginn, gleicher Ort) zusammen und beendet sonst den früheren Einsatz am Beginn des nächsten. Zusätzlich listet die Prüfung Geräte mit gleichem Namen (getrennte Datensätze) zum Kontrollieren.
+
+In der Zeitachse eines Projekts hat jedes Gerät eine Zeile; mehrere Einsätze im selben Projekt (z.B. nach einem Standortwechsel) stehen als Balken nebeneinander, mit «2×» beim Namen.
+
 ## 3. Bedienung in Kürze
 
 **Standort und Projekt sind getrennt.** Der Standort sagt, wo ein Gerät genau ist (im Feld mit LV95-Position, oder in einem Magazin). Das Projekt ist eine separate, optionale Angabe für Abrechnung und Projekthistorie.
@@ -154,7 +160,7 @@ Der lokale Testmodus hat keine Anmeldung; die Daten liegen dort nur im eigenen B
 
 ## 4. Erweitern
 
-**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.6.0**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.6.0`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
+**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.6.1**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.6.1`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
 
 
 **Neue Attribute ohne Programmieren:** Einstellungen › Kategorien › Kategorie öffnen › **Zusatzfelder** (Text, Zahl, Datum). Die Felder erscheinen sofort in der Maske, im Detail und im Excel-Export.

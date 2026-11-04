@@ -547,6 +547,16 @@
       if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(mail)) { M.toast('Bitte eine gültige E-Mail-Adresse eingeben (z.B. vorname.name@ristag.ch).', 'err'); return; }
       M.setRolle(mail, r).then(function () { M.toast(mail + ' ist jetzt ' + M.ROLLEN[r].name); });
     },
+    'check-open': function () {
+      M.state.drawer = null; M.go('einstellungen');
+      setTimeout(function () { var s = $('sec-check'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+    },
+    'check-fix': function () {
+      var n = M.datenCheck().n;
+      M.confirm('Daten bereinigen?', n + (n === 1 ? ' Gerät' : ' Geräte') + ' mit sich überschneidenden Einsätzen werden korrigiert: exakte Doppel zusammengeführt, sonst endet der frühere Einsatz am Beginn des nächsten. Die Historie bleibt sonst unverändert.', 'Bereinigen', function () {
+        return M.datenRepair().then(function (r) { M.toast('Bereinigt: ' + r.zusammengefuehrt + ' Doppel zusammengeführt, ' + r.beendet + ' Einsätze beendet'); M.refreshUI(); });
+      });
+    },
     'user-del': function (d) {
       M.confirm('Eintrag entfernen?', d.mail + ' gilt danach als User (ohne Finanzen).', 'Entfernen', function () { return M.setRolle(d.mail, null); });
     },
@@ -740,7 +750,7 @@
   var FIN_ACT = set('abr-q abr-export abr-view abr-pdf pos-new pos-edit pos-del po-grp po-art amort-scope amort-mode');
   function allowed(an, d) {
     if (an === 'role-test') return M.realRole() === 'admin';
-    if (an === 'user-add' || an === 'user-del') return M.can('admin');
+    if (an === 'user-add' || an === 'user-del' || an === 'check-fix' || an === 'check-open') return M.can('admin');
     if (!M.can('fin') && (FIN_ACT[an] || (an === 'dw-tab' && d.k === 'amort'))) return false;
     if (!M.can('edit')) return !!RO_ACT[an] || (an === 'scan-go' && d.k === 'inv');
     return true;

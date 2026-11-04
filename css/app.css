@@ -1043,3 +1043,13 @@ form .posbox:not(:empty) { margin-top: 14px; }
   .top { gap: var(--top-gap); padding-left: 16px; }
   .top > .brand { flex: none; width: calc(var(--side-w) + 12px - 16px - var(--top-gap)); min-width: 0; }
 }
+
+/* Datenprüfung */
+.ck-list { border-top: 1px solid var(--linie); margin: 8px 0 12px; max-height: 420px; overflow-y: auto; }
+.ck-row { display: flex; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--linie-2); font-size: 13px; }
+.ck-row > :first-child { flex: 0 0 200px; min-width: 0; overflow-wrap: anywhere; }
+.ck-d { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.g-row.g-bad .g-n { color: var(--signal-t); }
+.g-bar.bad { box-shadow: inset 0 0 0 2px var(--signal); }
+.g-cnt { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 8px; background: var(--himmel); color: var(--blau); font: 700 10.5px/16px var(--f-head); }
+@media (max-width: 760px) { .ck-row { flex-direction: column; gap: 4px; } .ck-row > :first-child { flex: none; } }

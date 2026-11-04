@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.6.0';
+  M.VERSION = '0.6.1';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -521,6 +521,8 @@
     else if (t.planMonate) { target.planMonate = +t.planMonate; target.planBis = M.addMonths(datum, +t.planMonate); }
     else if (t.planBis !== undefined) { target.planBis = t.planBis || null; target.planMonate = null; }
     else { target.planBis = sameProj ? cur.planBis || null : null; target.planMonate = sameProj ? cur.planMonate || null : null; }
+    // gleiches Projekt, aber keine neue Position angegeben («Position folgt»): bisherige Position behalten
+    if (sameProj && feld && !M.has(target.lat) && M.has(cur.lat)) { target.lat = cur.lat; target.lng = cur.lng; target.ortName = cur.ortName || ''; }
     if (cur) {
       if (cur.ort === target.ort && (cur.magazinId || null) === target.magazinId && (cur.projektId || null) === target.projektId &&
         cur.lat === target.lat && cur.lng === target.lng) {
@@ -682,6 +684,74 @@
   };
   M.removeFromGruppe = function (ids) {
     return Promise.all(ids.map(function (id) { var c = M.copy(M.idx().ger[id]); c.gruppeId = null; return M.put('geraete', c); }));
+  };
+
+  /* ---------- Datenprüfung
+     Die Einsätze eines Geräts dürfen sich zeitlich nicht überschneiden; höchstens einer ist laufend.
+     Überschneidungen entstehen z.B. durch doppelten Import oder gleichzeitiges Speichern auf zwei Geräten
+     und lassen ein Gerät in einem Projekt doppelt erscheinen. */
+  function samePlace(a, b) {
+    return a.ort === b.ort && (a.projektId || null) === (b.projektId || null) && (a.magazinId || null) === (b.magazinId || null) &&
+      (!M.has(a.lat) || !M.has(b.lat) || M.dist([a.lat, a.lng], [b.lat, b.lng]) < 3);
+  }
+  function inProj(e, pid) { return e.projektId === pid || e.magazinId === pid; }
+  M.datenCheck = function (pid) {
+    var I = M.idx(), res = { probleme: [], ids: {}, ger: {}, n: 0, namen: [] };
+    Object.keys(I.ein).forEach(function (gid) {
+      if (!I.ger[gid]) return;
+      var es = I.ein[gid].slice().sort(function (a, b) { return a.von < b.von ? -1 : a.von > b.von ? 1 : (a.bis ? 0 : 1) - (b.bis ? 0 : 1); });
+      var fixes = [];
+      for (var k = 0; k < es.length - 1; k++) {
+        var a = es[k], b = es[k + 1];
+        if ((a.bis || '9999-12-31') <= b.von) continue;
+        fixes.push({ a: a, b: b, art: a.von === b.von && samePlace(a, b) ? 'doppelt' : !a.bis ? 'offen' : 'ueberlappt' });
+      }
+      if (!fixes.length) return;
+      if (pid && !fixes.some(function (f) { return inProj(f.a, pid) || inProj(f.b, pid); })) return;
+      res.probleme.push({ gid: gid, fixes: fixes });
+      fixes.forEach(function (f) { res.ids[f.a.id] = 1; res.ids[f.b.id] = 1; });
+      res.ger[gid] = 1; res.n++;
+    });
+    if (!pid) {
+      var by = {};
+      M.state.data.geraete.forEach(function (g) {
+        if (g.typ === 'messstelle' || g.zustand === 'ausgemustert') return;
+        var k = String(g.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        if (k) (by[k] = by[k] || []).push(g);
+      });
+      Object.keys(by).forEach(function (k) { if (by[k].length > 1) res.namen.push(by[k]); });
+    }
+    return res;
+  };
+  /* Bereinigen: doppelte Einträge (gleicher Beginn, gleicher Ort) zusammenführen, sonst den früheren Einsatz
+     beim Beginn des nächsten beenden. Nichts geht verloren ausser exakten Doppeln. */
+  M.datenRepair = function () {
+    var jobs = [], nFix = 0, nDel = 0, wer = M.userKuerzel() || 'Datenprüfung';
+    for (var pass = 0; pass < 6; pass++) {
+      var r = M.datenCheck(), touched = {}, any = false;
+      r.probleme.forEach(function (pr) {
+        pr.fixes.forEach(function (f) {
+          if (touched[f.a.id] || touched[f.b.id]) return;
+          touched[f.a.id] = touched[f.b.id] = 1; any = true;
+          if (f.art === 'doppelt') {
+            // behalten: der laufende, sonst der mit Position bzw. Offertposition
+            var score = function (e) { return (e.bis ? 0 : 4) + (M.has(e.lat) ? 2 : 0) + (e.positionId ? 1 : 0); };
+            var keep = score(f.b) >= score(f.a) ? f.b : f.a, drop = keep === f.b ? f.a : f.b;
+            var c = M.copy(keep);
+            ['auftrag', 'positionId', 'einheit', 'planBis', 'planMonate', 'ortName', 'bemerkung'].forEach(function (k) { if (!M.has(c[k]) || c[k] === '') c[k] = drop[k]; });
+            if (!M.has(c.lat) && M.has(drop.lat)) { c.lat = drop.lat; c.lng = drop.lng; }
+            if (c.bis && drop.bis && drop.bis > c.bis) c.bis = drop.bis;
+            if (c.bis && !drop.bis) c.bis = null;
+            jobs.push(M.put('einsaetze', c), M.del('einsaetze', drop.id)); nDel++;
+          } else {
+            var a = M.copy(f.a); a.bis = f.b.von; if (!a.geholtVon) a.geholtVon = wer;
+            jobs.push(M.put('einsaetze', a)); nFix++;
+          }
+        });
+      });
+      if (!any) break;
+    }
+    return Promise.all(jobs).then(function () { return { beendet: nFix, zusammengefuehrt: nDel }; });
   };
 
   M.fillOrtName = function (eid) {

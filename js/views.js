@@ -635,7 +635,8 @@
   M.renderProjekte = function () {
     var I = M.idx(), f = M.state.filters.proj, q = f.q.trim().toLowerCase();
     var now = {};
-    M.state.data.einsaetze.forEach(function (e) { if (!e.bis) { var k = e.ort === 'magazin' ? e.magazinId : e.projektId; if (k) now[k] = (now[k] || 0) + 1; } });
+    var seen = {};   // Geräte zählen, nicht Einsätze (ein Gerät mit zwei offenen Einsätzen zählt einmal)
+    M.state.data.einsaetze.forEach(function (e) { if (!e.bis) { var k = e.ort === 'magazin' ? e.magazinId : e.projektId; if (k && !seen[k + '|' + e.geraetId]) { seen[k + '|' + e.geraetId] = 1; now[k] = (now[k] || 0) + 1; } } });
     var list = M.state.data.projekte.filter(function (p) {
       if (f.status === 'aktiv' && (p.typ !== 'projekt' || p.status === 'abgeschlossen')) return false;
       if (f.status === 'abgeschlossen' && (p.typ !== 'projekt' || p.status !== 'abgeschlossen')) return false;
@@ -670,7 +671,9 @@
     allE.forEach(function (e) { var g = I.ger[e.geraetId]; if (g && g.typ === 'messstelle' && !e.bis) msJetzt[g.id] = true; });
     var eins = allE.filter(function (e) { return I.ger[e.geraetId] && I.ger[e.geraetId].typ !== 'messstelle'; }).sort(function (a, b) { return a.von < b.von ? -1 : 1; });
     var heute = M.today();
-    var jetzt = eins.filter(function (e) { return !e.bis; });
+    var jetzt = [], jSeen = {};
+    eins.forEach(function (e) { if (!e.bis && !jSeen[e.geraetId]) { jSeen[e.geraetId] = 1; jetzt.push(e); } });
+    var chk = M.datenCheck(p.id);
     var ger = {}, tage = 0, amort = 0;
     eins.forEach(function (e) { ger[e.geraetId] = true; tage += Math.max(0, M.days(e.von, e.bis || heute)); amort += M.einsatzAmort(e); });
     var nKab = mag ? 0 : M.state.data.kabel.filter(function (k) { return k.projektId === p.id; }).length;
@@ -684,6 +687,8 @@
       '<div class="tile"><b>' + M.chf(tage) + '</b><span>Gerätetage</span></div>' +
       (!mag ? (M.can('fin') ? '<div class="tile t-blue"><b>CHF ' + M.chf(verr) + '</b><span>Verrechnet bis heute</span></div>' : '<div class="tile"><b>' + jetzt.filter(function (e) { return e.ort === 'feld'; }).length + '</b><span>Geräte im Feld</span></div>') : '<div class="tile"><b>–</b><span>Magazin: keine Amortisation</span></div>') + '</div>';
 
+    if (chk.n && M.can('edit')) h += '<div class="hint warn">' + chk.n + (chk.n === 1 ? ' Gerät hat' : ' Geräte haben') + ' in diesem Projekt sich überschneidende Einsätze (z.B. zweimal laufend) und erscheinen doppelt. ' +
+      (M.can('admin') ? '<button type="button" class="link-btn" data-act="check-open" data-id="' + p.id + '">Prüfen und bereinigen</button>' : 'Bitte einen Admin informieren (Einstellungen › Datenprüfung).') + '</div>';
     if (!mag && M.can('fin')) h += posHtml(p);
     if (!mag && M.can('fin')) h += abrHtml(p);
     if (!mag) h += '<div class="sec-h"><span>Dokumente · ' + (M.can('fin') ? 'Offerte, Pläne' : 'Pläne, Berichte') + '</span></div>' + M.filesHtml('projekt', p.id, { compactUpload: true });
@@ -713,13 +718,20 @@
       }
       if (ende > heute) ticks += '<span class="gt g-now" style="left:' + xHeute.toFixed(2) + '%">heute</span>';
       h += '<div class="g-row g-head"><span class="g-n"></span><div class="g-track">' + ticks + '</div><span class="g-a">' + (mag ? '' : 'CHF') + '</span></div>';
-      eins.forEach(function (e) {
-        var g = I.ger[e.geraetId]; if (!g) return;
-        var i = M.info(g.id), grp = S.GRUPPEN[i.gruppe];
-        var l = M.days(start, e.von) / span * 100, w = Math.max(0.6, M.days(e.von, e.bis || heute) / span * 100);
-        h += '<div class="g-row"><button type="button" class="g-n link-btn" data-act="open" data-id="' + g.id + '">' + M.symbol(g.id, 18) + esc(g.name) + '</button>' +
-          '<div class="g-track">' + (ende > heute ? '<span class="g-today" style="left:' + xHeute.toFixed(2) + '%"></span>' : '') + '<span class="g-bar' + (e.bis ? ' done' : '') + '" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;--f:' + grp.fill + ';--i:' + grp.ink + '" title="' + esc(M.ortText(e)) + ' · ' + M.fmtDate(e.von) + ' – ' + (e.bis ? M.fmtDate(e.bis) : 'laufend') + (e.planBis ? ' · ' + M.planText(e) : '') + '"></span>' + planBar(e) + '</div>' +
-          '<span class="g-a mono">' + (M.einsatzAmort(e) ? M.chf(M.einsatzAmort(e)) : (mag || e.ort === 'magazin' ? '' : '–')) + '</span></div>';
+      // eine Zeile pro Gerät; mehrere Einsätze (z.B. Standortwechsel im Projekt) als Balken nebeneinander
+      var rows = [], byG = {};
+      eins.forEach(function (e) { if (!I.ger[e.geraetId]) return; if (!byG[e.geraetId]) { byG[e.geraetId] = []; rows.push(e.geraetId); } byG[e.geraetId].push(e); });
+      rows.forEach(function (gid) {
+        var g = I.ger[gid], i = M.info(gid), grp = S.GRUPPEN[i.gruppe], es = byG[gid], sum = 0, bars = '';
+        es.forEach(function (e) {
+          var l = M.days(start, e.von) / span * 100, w = Math.max(0.6, M.days(e.von, e.bis || heute) / span * 100);
+          sum += M.einsatzAmort(e);
+          bars += '<span class="g-bar' + (e.bis ? ' done' : '') + (chk.ids[e.id] ? ' bad' : '') + '" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;--f:' + grp.fill + ';--i:' + grp.ink + '" title="' + esc(M.ortText(e)) + ' · ' + M.fmtDate(e.von) + ' – ' + (e.bis ? M.fmtDate(e.bis) : 'laufend') + (e.planBis ? ' · ' + M.planText(e) : '') + '"></span>' + planBar(e);
+        });
+        var anyFeld = es.some(function (e) { return e.ort !== 'magazin'; });
+        h += '<div class="g-row' + (chk.ger[gid] ? ' g-bad' : '') + '"><button type="button" class="g-n link-btn" data-act="open" data-id="' + gid + '">' + M.symbol(gid, 18) + esc(g.name) + (es.length > 1 ? ' <span class="g-cnt" title="' + es.length + ' Einsätze in diesem Projekt">' + es.length + '×</span>' : '') + '</button>' +
+          '<div class="g-track">' + (ende > heute ? '<span class="g-today" style="left:' + xHeute.toFixed(2) + '%"></span>' : '') + bars + '</div>' +
+          '<span class="g-a mono">' + (sum ? M.chf(sum) : (mag || !anyFeld ? '' : '–')) + '</span></div>';
       });
       if (!mag) h += '<div class="g-row g-sum"><span class="g-n">Summe</span><div class="g-track"></div><span class="g-a mono">' + M.chf(amort) + '</span></div>';
       h += '</div></div><p class="muted small">Schraffiert = abgeschlossener Einsatz. Gestrichelt = geplante Laufzeit; rot = länger im Einsatz als geplant.</p>';
@@ -757,6 +769,7 @@
     }
     h += '</section>';
     if (M.realRole() === 'admin') h += rollenHtml();
+    if (M.can('admin')) h += checkHtml();
 
     h += '<section class="card"><h2>Wartung</h2><form class="grid3" data-form="settings-wartung">' +
       '<label class="fld"><span>Tachymeter, Monate</span><input id="set-int-ts" type="number" min="1" max="120" value="' + esc(st.intervall.tachymeter || '') + '"></label>' +
@@ -806,6 +819,40 @@
     h += '</section><p class="muted small">MonInv Version ' + M.VERSION + ' · Monitoring-Inventar RISTAG Ingenieure AG · Kartendaten © swisstopo</p></div>';
     keepScroll($('v-einstellungen'), h);
   };
+
+  /* ---------- Datenprüfung (nur Admin) */
+  function checkHtml() {
+    var r = M.datenCheck(), I = M.idx();
+    var h = '<section class="card" id="sec-check"><div class="card-h"><h2>Datenprüfung</h2><span class="grow"></span>' +
+      (r.n ? '<button type="button" class="btn sm" data-act="check-fix">Bereinigen (' + r.n + ')</button>' : '') + '</div>';
+    if (!r.n && !r.namen.length) return h + '<p class="ok-t"><b>Alles in Ordnung.</b> Keine Geräte mit sich überschneidenden Einsätzen, keine doppelten Gerätenamen.</p></section>';
+    if (r.n) {
+      h += '<p class="small">' + r.n + (r.n === 1 ? ' Gerät hat' : ' Geräte haben') + ' Einsätze, die sich zeitlich überschneiden (z.B. zweimal laufend). Sie erscheinen in Projekten doppelt und können doppelt abgerechnet werden. ' +
+        '«Bereinigen» führt exakte Doppel zusammen und beendet sonst den früheren Einsatz am Beginn des nächsten.</p><div class="ck-list">';
+      var lbl = { doppelt: 'doppelt erfasst', offen: 'zweimal laufend', ueberlappt: 'überschneiden sich' };
+      r.probleme.slice(0, 60).forEach(function (pr) {
+        var g = I.ger[pr.gid];
+        h += '<div class="ck-row"><button type="button" class="link-btn strong" data-act="open" data-id="' + pr.gid + '">' + esc(g.name) + '</button><div class="ck-d">' +
+          pr.fixes.map(function (f) {
+            var e2 = function (e) { return esc(M.ortText(e)) + ' ' + M.fmtDate(e.von) + '–' + (e.bis ? M.fmtDate(e.bis) : 'laufend'); };
+            return '<span><b>' + lbl[f.art] + ':</b> ' + e2(f.a) + ' · ' + e2(f.b) + '</span>';
+          }).join('') + '</div></div>';
+      });
+      if (r.probleme.length > 60) h += '<p class="muted small">… und ' + (r.probleme.length - 60) + ' weitere</p>';
+      h += '</div>';
+    }
+    if (r.namen.length) {
+      h += '<p class="small"><b>Gleicher Name bei mehreren Geräten</b> (' + r.namen.length + '). Das sind getrennte Datensätze, z.B. aus einem doppelten Import. Bitte prüfen und überzählige löschen oder umbenennen:</p><div class="ck-list">';
+      r.namen.slice(0, 40).forEach(function (gs) {
+        h += '<div class="ck-row"><b>' + esc(gs[0].name) + '</b><div class="ck-d">' + gs.map(function (g) {
+          var i = M.info(g.id);
+          return '<span><button type="button" class="link-btn" data-act="open" data-id="' + g.id + '">öffnen</button> ' + esc(i.ortText) + (g.seriennummer ? ' · SN ' + esc(g.seriennummer) : '') + '</span>';
+        }).join('') + '</div></div>';
+      });
+      h += '</div>';
+    }
+    return h + '</section>';
+  }
 
   /* ---------- Benutzer und Rollen (nur Admin) */
   function rollenHtml() {
