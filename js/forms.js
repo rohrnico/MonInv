@@ -880,7 +880,7 @@
 
   /* ================================================== GERÄT PLATZIEREN (von der Karte aus) */
   M.openPlace = function (gid, scanned) {
-    var I = M.idx(), auto = !gid && !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    var I = M.idx();
     var list = M.state.data.geraete.filter(function (g) { var i = M.info(g.id); return g.zustand !== 'ausgemustert' && !i.mccTs; })
       .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de', { numeric: true }); });
     if (!list.length) { M.toast('Noch keine Geräte erfasst. Neue Geräte legt man unter «Inventar» an.'); return; }
@@ -904,7 +904,7 @@
       '<p class="form-err" id="pg-err" role="alert"></p>';
     M.modal({ title: 'Gerät platzieren', form: 'place', body: b, noFocus: true, foot: foot('Weiter: Position setzen') });
     M.posSync('pg');
-    if (M.scanInline) M.scanInline('pg', { auto: auto, label: scanned ? 'Anderes Gerät scannen' : 'Gerät per QR-Code scannen', onPick: M.placeScanned });
+    if (M.scanInline) M.scanInline('pg', { label: scanned ? 'Anderes Gerät scannen' : 'Gerät per QR-Code scannen', onPick: M.placeScanned });
   };
   /* gescanntes Gerät in «Gerät platzieren» übernehmen – ohne Rückfrage, was damit geschehen soll */
   M.placeScanned = function (g) {

@@ -815,13 +815,15 @@ body.viewer-open { overflow: hidden; }
 .sc-manual { margin-top: 12px; }
 .sc-manual .row-in input { flex: 1; min-width: 0; }
 /* QR-Auswahl über einem offenen Dialog (z.B. MCC zum Tachymeter) */
-.si { margin: -2px 0 14px; padding: 12px; background: var(--himmel-2); border: 1.5px solid var(--blau); }
+.si { margin: -2px 0 14px; }
+.si-cam:not([hidden]) + .si-row { margin-top: 0; }
 .si-cam { margin-bottom: 10px; aspect-ratio: auto; height: min(40vh, 250px); width: 100%; }
 .si-cam .sc-frame { width: min(58%, 40vh - 70px, 170px); margin-top: -22px; }
 .si-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .si-go { flex: 1 1 240px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; }
 .si-go .ic { width: 22px; height: 22px; vertical-align: 0; }
 .si-man { flex: 1 1 200px; }
+.si-cam[hidden] ~ .si-row .si-man { display: none; }   /* Eintippen erst, wenn der Scanner läuft */
 .si-man input { flex: 1; min-width: 0; }
 .mv-from.si-hit { animation: rise .25s ease both; box-shadow: inset 4px 0 0 #2E8B5E; padding-left: 10px; }
 .sp-ov { position: fixed; inset: 0; z-index: 1350; background: rgba(0,12,24,.72); display: flex; align-items: flex-start; justify-content: center; padding: 5vh 16px 16px; overflow-y: auto; animation: fadein .15s ease both; }
