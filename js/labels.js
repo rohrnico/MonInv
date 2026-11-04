@@ -403,7 +403,50 @@
     return pre.then(function () { return M.setMcc(tsId, mccId); }).then(function () { return { alt: alt }; });
   };
   var origClose = M.closeModal;
-  M.closeModal = function () { stopScan(); origClose(); };
+  M.closeModal = function () { stopScan(); inlStop(); origClose(); };
+  var origModal = M.modal;
+  M.modal = function () { inlStop(); return origModal.apply(this, arguments); };
+
+  /* ---------- Scanner direkt im Dialog (z.B. «Gerät platzieren»): Gerät per QR wählen, ohne Rückfrage */
+  var inl = null;   // { p, o, cam }
+  function inlStop() { if (inl && inl.cam) inl.cam.stop(); inl = null; }
+  function inlMsg(t, err) { var m = inl && $(inl.p + '-simsg'); if (m) { m.textContent = t; m.classList.toggle('err', !!err); } }
+  function inlBtn(running) {
+    var b = inl && $(inl.p + '-sigo'); if (!b) return;
+    b.classList.toggle('ghost', !!running);
+    b.querySelector('span').textContent = running ? 'Kamera ausschalten' : inl.o.label || 'Gerät per QR-Code scannen';
+  }
+  function inlStart() {
+    if (!inl) return;
+    var box = $(inl.p + '-sicam'); if (!box) return;
+    box.hidden = false; inlBtn(true);
+    inl.cam = camStart($(inl.p + '-sivideo'), inlCode, inlMsg);
+  }
+  function inlOff() {
+    if (!inl) return;
+    if (inl.cam) inl.cam.stop(); inl.cam = null;
+    var box = $(inl.p + '-sicam'); if (box) box.hidden = true;
+    inlBtn(false);
+  }
+  function inlCode(txt) {
+    if (!inl) return;
+    var g = M.findByCode(txt);
+    if (!g) { inlMsg('Unbekannter Code: ' + String(txt).slice(0, 50), true); return; }
+    if (navigator.vibrate) navigator.vibrate(60);
+    var o = inl.o; inlStop();
+    o.onPick(g);
+  }
+  M.scanInlineHtml = function (p, label) {
+    return '<div class="si" id="' + p + '-si"><div class="sc-cam si-cam" id="' + p + '-sicam" hidden><video id="' + p + '-sivideo" playsinline muted></video><div class="sc-frame" aria-hidden="true"></div><p class="sc-msg" id="' + p + '-simsg" aria-live="polite">Kamera wird gestartet …</p></div>' +
+      '<div class="si-row"><button type="button" class="btn si-go" id="' + p + '-sigo" data-act="si-toggle">' + M.ico('qr') + '<span>' + esc(label || 'Gerät per QR-Code scannen') + '</span></button>' +
+      '<span class="row-in si-man"><input id="' + p + '-sicode" autocomplete="off" placeholder="oder Code / Name eintippen" data-enter="si-manual"><button type="button" class="btn ghost sm" data-act="si-manual">OK</button></span></div></div>';
+  };
+  M.scanInline = function (p, o) {
+    inlStop();
+    inl = { p: p, o: o };
+    if (o.auto) inlStart();
+  };
+  M.scanInlineStop = inlStop;
 
   M.openScan = function (mode) {
     M.ctx = { kind: 'scan' };
@@ -527,6 +570,14 @@
       } });
     },
     'sp-close': function () { pickClose(); },
+    'si-toggle': function () { if (!inl) return; if (inl.cam) inlOff(); else inlStart(); },
+    'si-manual': function () {
+      if (!inl) return;
+      var el = $(inl.p + '-sicode'), v = (el || {}).value || ''; if (!v.trim()) return;
+      var g = M.findByCode(v);
+      if (!g) { if ($(inl.p + '-sicam').hidden) M.toast('Nichts gefunden für «' + v.trim() + '»', 'err'); else inlMsg('Nichts gefunden für «' + v.trim() + '»', true); return; }
+      inlCode(g.qr || g.id);
+    },
     'sp-manual': function () {
       var v = ($('sp-code') || {}).value || ''; if (!v.trim()) return;
       var g = M.findByCode(v); if (!g) { pickMsg('Nichts gefunden für «' + v.trim() + '»', true); return; }

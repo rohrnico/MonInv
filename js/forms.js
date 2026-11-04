@@ -879,8 +879,8 @@
   };
 
   /* ================================================== GERÄT PLATZIEREN (von der Karte aus) */
-  M.openPlace = function (gid) {
-    var I = M.idx();
+  M.openPlace = function (gid, scanned) {
+    var I = M.idx(), auto = !gid && !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
     var list = M.state.data.geraete.filter(function (g) { var i = M.info(g.id); return g.zustand !== 'ausgemustert' && !i.mccTs; })
       .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de', { numeric: true }); });
     if (!list.length) { M.toast('Noch keine Geräte erfasst. Neue Geräte legt man unter «Inventar» an.'); return; }
@@ -889,7 +889,8 @@
     M.ctx = { kind: 'place', gid: gid };
     function group(label, arr) { return arr.length ? '<optgroup label="' + esc(label) + '">' + arr.map(function (x) { var xi = M.info(x.id); return opt(x.id, x.name + ' · ' + xi.ortText + (xi.res ? ' · reserviert für ' + M.projName(xi.res.proj) : ''), x.id === gid); }).join('') + '</optgroup>' : ''; }
     var mag = list.filter(function (x) { return M.info(x.id).isMag; }), feld = list.filter(function (x) { var ii = M.info(x.id); return ii.cur && !ii.isMag; }), ohne = list.filter(function (x) { return !M.info(x.id).cur; });
-    var b = '<div class="mv-from">' + M.symbol(gid, 36) + '<div><b>' + esc(g.name) + '</b><span>Bisher: ' + esc(i.ortText) + (i.proj ? ' · Projekt ' + esc(M.projName(i.proj)) : '') + '</span></div></div>' +
+    var b = (M.scanInlineHtml ? M.scanInlineHtml('pg', scanned ? 'Anderes Gerät scannen' : 'Gerät per QR-Code scannen') : '') +
+      '<div class="mv-from' + (scanned ? ' si-hit' : '') + '">' + M.symbol(gid, 36) + '<div><b>' + esc(g.name) + '</b><span>' + (scanned ? 'Gescannt · ' : '') + 'Bisher: ' + esc(i.ortText) + (i.proj ? ' · Projekt ' + esc(M.projName(i.proj)) : '') + '</span></div></div>' +
       fld('Gerät', '<select id="pg-dev" data-change="pg-dev">' + group('Im Magazin', mag) + group('Im Feld', feld) + group('Ohne Standort', ohne) + '</select>') +
       '<div class="grid2">' + M.projSelHtml('pg', i.proj ? i.proj.id : i.res ? i.res.proj.id : '') +
       fld('Datum', inp('pg-date', M.today(), 'type="date" data-change="plan-in" data-p="pg"')) + '</div>' + M.newProjBox('pg') +
@@ -901,8 +902,19 @@
       fld('Wer', inp('pg-wer', M.userKuerzel(), 'maxlength="40"')) +
       '<p class="muted small">Nach «Weiter: Position setzen» den Ort in die Karte tippen, per GPS übernehmen, LV95 eingeben oder eine Adresse suchen. Neue Geräte erfasst man unter «Inventar».</p>' +
       '<p class="form-err" id="pg-err" role="alert"></p>';
-    M.modal({ title: 'Gerät platzieren', form: 'place', body: b, foot: foot('Weiter: Position setzen') });
+    M.modal({ title: 'Gerät platzieren', form: 'place', body: b, noFocus: true, foot: foot('Weiter: Position setzen') });
     M.posSync('pg');
+    if (M.scanInline) M.scanInline('pg', { auto: auto, label: scanned ? 'Anderes Gerät scannen' : 'Gerät per QR-Code scannen', onPick: M.placeScanned });
+  };
+  /* gescanntes Gerät in «Gerät platzieren» übernehmen – ohne Rückfrage, was damit geschehen soll */
+  M.placeScanned = function (g) {
+    var i = M.info(g.id), id = g.id;
+    if (g.zustand === 'ausgemustert') { M.toast(g.name + ' ist ausgemustert und kann nicht platziert werden.', 'err'); return M.scanInline && M.scanInline('pg', { label: 'Anderes Gerät scannen', onPick: M.placeScanned }); }
+    if (i.mccTs) { id = i.mccTs.id; M.toast(g.name + ' gehört zu ' + i.mccTs.name + ' – der Tachymeter wird platziert, die MCC kommt mit'); }
+    var keep = { date: val('pg-date'), wer: val('pg-wer') };
+    M.openPlace(id, true);
+    if (keep.date && $('pg-date')) $('pg-date').value = keep.date;
+    if (keep.wer && $('pg-wer')) $('pg-wer').value = keep.wer;
   };
   M.submitPlace = function () {
     var gid = M.ctx.gid, g = M.idx().ger[gid];
