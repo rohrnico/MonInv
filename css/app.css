@@ -20,6 +20,8 @@
   --f-body: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
   --f-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   --top-h: 64px;
+  --side-w: 250px;   /* Breite der Filterspalte links der Karte */
+  --top-gap: 18px;
   --tab-h: 0px;
 }
 * { box-sizing: border-box; }
@@ -56,7 +58,7 @@ a { color: var(--blau); }
 .b-name { font: 800 26px/1 var(--f-head); }
 .b-sub { font: 600 9.5px/1 var(--f-head); letter-spacing: .14em; color: var(--stein); margin-top: 4px; white-space: nowrap; }
 .nav { display: flex; gap: 2px; font: 700 14.5px var(--f-head); }
-.nav a { padding: 10px 12px; text-decoration: none; color: var(--nacht); border-radius: 2px; }
+.nav a { padding: 10px 12px; white-space: nowrap; text-decoration: none; color: var(--nacht); border-radius: 2px; }
 .nav a:hover { background: var(--himmel-2); }
 .nav a.on { background: var(--blau); color: var(--weiss); }
 .search { position: relative; display: flex; align-items: center; gap: 8px; border: 1px solid #D3D2D1; padding: 0 10px; height: 40px; width: 280px; background: var(--weiss); color: var(--stein); }
@@ -141,7 +143,7 @@ fieldset.extra legend { font: 700 11.5px var(--f-head); letter-spacing: .09em; t
 main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .view { flex: 1; min-height: 0; }
 .v-karte { display: flex; min-height: 0; position: relative; }
-.side { flex: none; width: 250px; background: var(--weiss); border-right: 1px solid var(--linie); overflow-y: auto; padding: 14px 14px 24px; }
+.side { flex: none; width: var(--side-w); background: var(--weiss); border-right: 1px solid var(--linie); overflow-y: auto; padding: 14px 14px 24px; }
 .side-bg { display: none; }
 .side-sec { margin-bottom: 20px; display: flex; flex-direction: column; gap: 4px; }
 .sec-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font: 700 11.5px var(--f-head); letter-spacing: .13em; text-transform: uppercase; color: var(--blau); border-bottom: 2px solid var(--blau); padding-bottom: 4px; margin: 18px 0 8px; }
@@ -506,7 +508,7 @@ code { font-family: var(--f-mono); font-size: .92em; background: var(--nebel); p
   .b-sub { display: none; }
   .search { width: 220px; }
   .panel { width: 330px; }
-  .side { width: 220px; }
+  :root { --side-w: 220px; }
 }
 @media (max-width: 1080px) {
   .nav { display: none; }
@@ -1032,5 +1034,12 @@ form .posbox:not(:empty) { margin-top: 14px; }
 /* RISTAG-Logo oben rechts */
 .top-logo { display: block; flex: none; height: 38px; width: auto; margin-left: 4px; padding-left: 16px; border-left: 1px solid var(--linie); box-sizing: content-box; }
 @media (max-width: 1280px) { .top-logo { height: 32px; padding-left: 12px; } .nav a { white-space: nowrap; padding: 10px 9px; } .top .ver { display: none; } }
-@media (max-width: 1200px) and (min-width: 1081px) { .top { gap: 12px; } .top .search { width: 180px; } .top .src { display: none; } }
+@media (max-width: 1200px) and (min-width: 1081px) { :root { --top-gap: 12px; } .top .search { width: 180px; } .top .src { display: none; } }
 @media (max-width: 760px) { .top-logo { display: none; } }
+
+/* Menü beginnt über der Karte: die Marke ist so breit wie die Filterspalte darunter
+   (Spaltenbreite + 12 px Einzug − Rand links − Abstand zum Menü) */
+@media (min-width: 1081px) {
+  .top { gap: var(--top-gap); padding-left: 16px; }
+  .top > .brand { flex: none; width: calc(var(--side-w) + 12px - 16px - var(--top-gap)); min-width: 0; }
+}
