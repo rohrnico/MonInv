@@ -71,6 +71,7 @@
       '<div>' + S.symbolHtml('boden', 'PZ', { size: 22, state: 'wartung' }) + 'Wartung fällig</div>' +
       '<div>' + S.symbolHtml('boden', 'PZ', { size: 22, state: 'ort' }) + 'Position fehlt</div>' +
       '<div>' + S.symbolHtml('boden', 'PZ', { size: 22, state: 'magazin' }) + 'Im Magazin</div>' +
+      '<div>' + S.symbolHtml('boden', 'PZ', { size: 22, state: 'reserviert' }) + 'Im Magazin, reserviert</div>' +
       '<div><span class="cl cl-mini" style="--cs:26px;background:conic-gradient(#F6E7A1 0 200deg,#CDBDE6 200deg 300deg,#F3C4D0 300deg 360deg)"><span class="cl-n">9</span></span>Zusammengefasst</div>';
     Object.keys(M.kabelTypen).forEach(function (k) {
       var t = M.kabelTypen[k];
@@ -217,7 +218,7 @@
     return '<div class="dt-head">' + M.symbol(gid, big ? 56 : 52) + '<div class="dt-t"><h2' + (big ? ' id="dw-t"' : '') + (g.name.length > 24 ? ' class="xlong"' : g.name.length > 12 ? ' class="long"' : '') + ' title="' + esc(g.name) + '">' + esc(g.name) + '</h2><span>' + esc(kname) +
       (g.gtyp && g.gtyp !== kname ? ' · ' + esc(g.gtyp) : '') + '</span></div></div>' +
       '<div class="dt-loc">' + M.stateChip(gid) + '<div><b>' + esc(i.mccTs ? 'beim Tachymeter ' + i.mccTs.name : i.ortText) + '</b>' +
-      (i.proj ? '<span>Projekt ' + esc(M.projName(i.proj)) + '</span>' : (i.cur && !i.isMag ? '<span class="muted">ohne Projekt</span>' : '')) + '</div></div>';
+      (i.proj ? '<span>Projekt ' + esc(M.projName(i.proj)) + '</span>' : i.res ? '<span class="res-t">reserviert für ' + esc(M.projName(i.res.proj)) + (i.res.ab ? ' · ab ' + M.fmtDate(i.res.ab) : '') + '</span>' : (i.cur && !i.isMag ? '<span class="muted">ohne Projekt</span>' : '')) + '</div></div>';
   };
   var ICO = {
     edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
@@ -229,6 +230,7 @@
     dup: '<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="1"/><path d="M15.5 8.5V4H4v11.5h4.5"/>',
     karte: '<path d="M9 4.5l-5.5 2v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/>',
     del: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5"/>',
+    res: '<path d="M7 3.5h10a1 1 0 0 1 1 1V21l-6-4-6 4V4.5a1 1 0 0 1 1-1z"/>',
     qr: '<rect x="4" y="4" width="6" height="6" rx=".5"/><rect x="14" y="4" width="6" height="6" rx=".5"/><rect x="4" y="14" width="6" height="6" rx=".5"/><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM14 20h1.5M20 14v1.5"/>'
   };
   function ico(k) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + ICO[k] + '</svg>'; }
@@ -248,6 +250,7 @@
       sec.push(act('move', gid, 'projekt', 'Projekt ändern'));
       sec.push(act('place', gid, 'pos', i.posSrc === 'eigen' ? 'Position ändern' : 'Position setzen'));
       sec.push(act('ms-add', gid, 'dup', 'Geräte hinzufügen'));
+      if (i.isMag) sec.push(act('reserve', gid, 'res', i.res ? 'Reservation ändern' : 'Reservieren'));
       if (i.pos) sec.push(act('kabel-from', gid, 'kabel', 'Kabel zeichnen'));
       if (big && i.pos) sec.push(act('show-map', gid, 'karte', 'Auf Karte'));
       if (big) sec.push(act('labels', gid, 'qr', 'Etikett'));
@@ -258,6 +261,7 @@
         '<div class="pa-grid">' + sec.join('') + '</div><div class="pa-foot">' + delMs + '</div></div>';
     }
     if (!i.mccTs) sec.push(act('move', gid, 'projekt', 'Projekt ändern'));
+    if (i.isMag && !i.ms) sec.push(act('reserve', gid, 'res', i.res ? 'Reservation ändern' : 'Reservieren'));
     if (i.cur && !i.isMag && !i.mccTs) sec.push(act('place', gid, 'pos', i.posSrc === 'eigen' ? 'Position ändern' : 'Position setzen'));
     if (i.wart) sec.push(act('wartung', gid, 'wartung', 'Wartung erfassen'));
     if (i.pos && !i.mccTs) sec.push(act('kabel-from', gid, 'kabel', 'Kabel zeichnen'));
@@ -330,6 +334,8 @@
     }
     if (full) h += attr('Standort', esc(i.mccTs ? 'beim Tachymeter ' + i.mccTs.name : i.ortText));
     h += attr('Projekt', i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>');
+    if (i.res) h += attr('Reserviert für', esc(M.projName(i.res.proj)) + (i.res.ab ? ' · Montage ab ' + M.fmtDate(i.res.ab) : '') + (i.res.bemerkung ? '<br><span class="muted small">' + esc(i.res.bemerkung) + '</span>' : '') +
+      ' <button type="button" class="link-btn" data-act="reserve" data-id="' + gid + '">ändern</button>');
     if (i.cur && !i.isMag) {
       var pr0 = M.posRate(i.cur);
       if (pr0) h += attr('Position', esc(M.posLabel(pr0.P)) + (pr0.u && pr0.u.devs.length > 1 ? '<br><span class="muted small">' + esc(M.unitLabel(pr0.P, pr0.u)) + '</span>' : ''));
@@ -370,13 +376,14 @@
       if (f.gruppe && i.gruppe !== f.gruppe) return false;
       if (f.ort === 'feld' && (i.isMag || !i.cur)) return false;
       if (f.ort && f.ort !== 'feld' && (!i.isMag || !i.mag || i.mag.id !== f.ort)) return false;
-      if (f.projekt && (!i.proj || i.proj.id !== f.projekt)) return false;
+      if (f.projekt && (!i.proj || i.proj.id !== f.projekt) && (!i.res || i.res.proj.id !== f.projekt)) return false;
       if (f.zustand) {
         if (f.zustand === 'issue' && !i.issue) return false;
+        if (f.zustand === 'reserviert' && (!i.res || g.zustand === 'ausgemustert')) return false;
         if ((f.zustand === 'defekt' || f.zustand === 'ausgemustert') && g.zustand !== f.zustand) return false;
       } else if (g.zustand === 'ausgemustert') return false;
       if (q) {
-        var hay = [g.name, i.kat && i.kat.name, g.hersteller, g.seriennummer, g.sim, g.gtyp, i.ortText, M.projName(i.proj), g.bemerkung].join(' ').toLowerCase();
+        var hay = [g.name, i.kat && i.kat.name, g.hersteller, g.seriennummer, g.sim, g.gtyp, i.ortText, M.projName(i.proj), i.res ? M.projName(i.res.proj) : '', g.bemerkung].join(' ').toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
@@ -402,7 +409,7 @@
       '<label class="fld"><span>Standort</span><select id="inv-ort" data-change="invf" data-k="ort">' + orte + '</select></label>' +
       '<label class="fld"><span>Projekt</span><select id="inv-proj" data-change="invf" data-k="projekt">' + projOptions(f.projekt, true, 'alle Projekte', true) + '</select></label>' +
       '<label class="fld"><span>Zustand</span><select id="inv-zst" data-change="invf" data-k="zustand">' + opt('', 'in Betrieb (ohne ausgemustert)', !f.zustand) +
-      opt('issue', 'Handlungsbedarf', f.zustand === 'issue') + opt('defekt', 'defekt', f.zustand === 'defekt') + opt('ausgemustert', 'ausgemustert', f.zustand === 'ausgemustert') + '</select></label></div>';
+      opt('issue', 'Handlungsbedarf', f.zustand === 'issue') + opt('reserviert', 'reserviert (im Magazin)', f.zustand === 'reserviert') + opt('defekt', 'defekt', f.zustand === 'defekt') + opt('ausgemustert', 'ausgemustert', f.zustand === 'ausgemustert') + '</select></label></div>';
     if (nSel) {
       h += '<div class="bulk"><b>' + nSel + ' ausgewählt</b><span class="grow"></span><div class="bulk-b">' +
         '<button type="button" class="btn sm inv" data-act="bulk-move">Projekt ändern …</button>' +
@@ -411,6 +418,7 @@
         '<button type="button" class="btn sm inv" data-act="bulk-auftrag">Auftragsnr. …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-plan">Laufzeit …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-mag">Ins Magazin …</button>' +
+        '<button type="button" class="btn sm inv" data-act="bulk-res">Reservieren …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-zst">Zustand ändern …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-labels">Etiketten …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-del">Löschen …</button>' +
@@ -441,7 +449,7 @@
         '<td class="c-name' + (child ? ' ms-indent' : '') + '"><button type="button" class="link-btn strong" data-act="open" data-id="' + g.id + '">' + esc(g.name) + '</button></td>' +
         '<td class="c-kat">' + esc(i.kat ? i.kat.name : M.typLabel[g.typ]) + '</td>' +
         '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.mccTs ? 'bei ' + i.mccTs.name : child ? 'mit der Messstelle' : i.ortText) + '</td>' +
-        '<td class="c-proj' + (child || i.proj || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (child ? '' : i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
+        '<td class="c-proj' + (child || i.proj || i.res || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (child ? '' : i.proj ? esc(M.projName(i.proj)) : i.res ? '<span class="res-t">res. ' + esc(M.projName(i.res.proj)) + '</span>' : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(g.hersteller || '') + '</td><td class="mono m-hide">' + esc(g.seriennummer || '') + '</td>' +
         '<td class="mono m-hide">' + M.fmtDate(g.kaufdatum) + '</td>' +
         '<td class="r mono m-hide fin">' + M.chf(g.wert) + '</td>' +
@@ -635,6 +643,8 @@
   M.renderProjekte = function () {
     var I = M.idx(), f = M.state.filters.proj, q = f.q.trim().toLowerCase();
     var now = {};
+    var resN = {};
+    M.state.data.einsaetze.forEach(function (e) { if (!e.bis && e.ort === 'magazin' && e.reserviert && e.reserviert.projektId) resN[e.reserviert.projektId] = (resN[e.reserviert.projektId] || 0) + 1; });
     var seen = {};   // Geräte zählen, nicht Einsätze (ein Gerät mit zwei offenen Einsätzen zählt einmal)
     M.state.data.einsaetze.forEach(function (e) { if (!e.bis) { var k = e.ort === 'magazin' ? e.magazinId : e.projektId; if (k && !seen[k + '|' + e.geraetId]) { seen[k + '|' + e.geraetId] = 1; now[k] = (now[k] || 0) + 1; } } });
     var list = M.state.data.projekte.filter(function (p) {
@@ -653,7 +663,7 @@
         return '<button type="button" data-act="projf" data-k="' + s + '" class="' + (f.status === s ? 'on' : '') + '">' + ({ aktiv: 'Aktiv', abgeschlossen: 'Abgeschlossen', magazin: 'Magazine' })[s] + '</button>';
       }).join('') + '</div><div class="pl-items">';
     list.forEach(function (p) {
-      h += '<button type="button" class="pl-item' + (p.id === M.state.projSel ? ' on' : '') + '" data-act="proj-sel" data-id="' + p.id + '"><span class="pi-t">' + esc(M.projName(p)) + '</span><span class="pi-n">' + (now[p.id] || 0) + '</span></button>';
+      h += '<button type="button" class="pl-item' + (p.id === M.state.projSel ? ' on' : '') + '" data-act="proj-sel" data-id="' + p.id + '"><span class="pi-t">' + esc(M.projName(p)) + '</span>' + (resN[p.id] ? '<span class="pi-r" title="' + resN[p.id] + ' im Magazin reserviert">+' + resN[p.id] + '</span>' : '') + '<span class="pi-n">' + (now[p.id] || 0) + '</span></button>';
     });
     if (!list.length) h += '<p class="muted small">Keine Einträge.</p>';
     h += '</div></div><div class="pl-detail">';
@@ -692,6 +702,13 @@
     if (!mag && M.can('fin')) h += posHtml(p);
     if (!mag && M.can('fin')) h += abrHtml(p);
     if (!mag) h += '<div class="sec-h"><span>Dokumente · ' + (M.can('fin') ? 'Offerte, Pläne' : 'Pläne, Berichte') + '</span></div>' + M.filesHtml('projekt', p.id, { compactUpload: true });
+    var resv = mag ? [] : M.state.data.geraete.filter(function (g) { var ii = M.info(g.id); return ii.res && ii.res.proj.id === p.id && !ii.ms && g.zustand !== 'ausgemustert'; })
+      .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'de', { numeric: true }); });
+    if (resv.length) {
+      h += '<div class="sec-h"><span>Reserviert · noch im Magazin</span><span class="muted">' + resv.length + (resv.length === 1 ? ' Gerät' : ' Geräte') + '</span></div><div class="chips-wrap">' +
+        resv.map(function (g) { var ii = M.info(g.id); return '<button type="button" class="dev-chip res-chip" data-act="open" data-id="' + g.id + '" title="' + esc(ii.ortText + (ii.res.bemerkung ? ' · ' + ii.res.bemerkung : '')) + '">' + M.symbol(g.id, 22) + '<span>' + esc(g.name) + '</span>' + (ii.res.ab ? '<span class="muted small">ab ' + M.fmtDate(ii.res.ab) + '</span>' : '') + '</button>'; }).join('') + '</div>' +
+        '<p class="muted small">Beim «Gerät platzieren» oder «Projekt ändern» ist dieses Projekt schon vorgewählt; mit dem Montieren endet die Reservation.</p>';
+    }
     if (jetzt.length) {
       h += '<div class="sec-h"><span>Jetzt ' + (mag ? 'hier' : 'im Projekt') + '</span></div><div class="chips-wrap">';
       Object.keys(msJetzt).sort(function (a, b) { return String(I.ger[a].name).localeCompare(String(I.ger[b].name), 'de', { numeric: true }); }).forEach(function (mid) {
@@ -951,6 +968,8 @@
     h += '</div><div class="sec-h"><span>Angaben</span></div><div class="attrs">';
     h += attr('Standort', esc(i.ortText));
     h += attr('Projekt', i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>');
+    if (i.res) h += attr('Reserviert für', esc(M.projName(i.res.proj)) + (i.res.ab ? ' · Montage ab ' + M.fmtDate(i.res.ab) : '') + (i.res.bemerkung ? '<br><span class="muted small">' + esc(i.res.bemerkung) + '</span>' : '') +
+      ' <button type="button" class="link-btn" data-act="reserve" data-id="' + gid + '">ändern</button>');
     if (i.cur && !i.isMag) {
       var pr0 = M.posRate(i.cur);
       if (pr0) h += attr('Position', esc(M.posLabel(pr0.P)) + (pr0.u && pr0.u.devs.length > 1 ? '<br><span class="muted small">' + esc(M.unitLabel(pr0.P, pr0.u)) + '</span>' : ''));
@@ -1047,6 +1066,7 @@
           (!mag ? '<span class="mono hx-amt">' + (amt ? 'CHF ' + M.chf(amt) : '–') + '</span>' : '') +
           '<button type="button" class="ic-btn" data-act="edit-einsatz" data-id="' + e.id + '" aria-label="Eintrag bearbeiten">✎</button></div>' +
           '<div class="hx-s">' + [p ? 'Projekt ' + esc(M.projName(p)) : (mag ? 'eingelagert' : 'ohne Projekt'),
+            mag && e.reserviert && I.proj[e.reserviert.projektId] ? '<span class="res-t">reserviert für ' + esc(M.projName(I.proj[e.reserviert.projektId])) + (e.reserviert.ab ? ' ab ' + M.fmtDate(e.reserviert.ab) : '') + '</span>' : '',
             M.auftragOf(e) ? 'Auftrag ' + esc(M.auftragOf(e)) : '',
             !mag && M.can('fin') ? (M.posRate(e) ? esc(M.posLabel(M.posRate(e).P)) : e.amortModus === 'monat' ? 'CHF ' + M.chf(e.amortBetrag) + ' pro Monat' : 'CHF ' + M.chf(e.amortBetrag) + ' pauschal') : '',
             lv ? '<span class="mono">LV95 ' + lv + '</span>' : '', who].filter(Boolean).join(' · ') + '</div></div></li>';

@@ -268,14 +268,14 @@
     M.state.data.kategorien.forEach(function (k) { (k.felder || []).forEach(function (f) { xs[f.name] = true; }); });
     var xk = Object.keys(xs);
     var head = ['Name', 'Gerätetyp', 'Kategorie', 'Gruppe', 'Typ', 'Hersteller', 'Seriennummer', 'Kaufdatum', 'Wert CHF', 'Amortisation aktueller Standort', 'Vor Erfassung amortisiert CHF', 'Stand per', 'Amortisiert total CHF', 'Standorte', 'Restwert CHF', 'Ertrag über Anschaffung CHF',
-      'SIM-Karte', 'Zustand', 'Standort', 'Projekt', 'Auftrag', 'Seit', 'Ost LV95', 'Nord LV95', 'Letzte Wartung', 'Tage seit Wartung', 'Intervall Monate', 'MCC / Tachymeter', 'Messstelle', 'Kabel', 'Bemerkung'].concat(xk);
+      'SIM-Karte', 'Zustand', 'Standort', 'Projekt', 'Reserviert für', 'Auftrag', 'Seit', 'Ost LV95', 'Nord LV95', 'Letzte Wartung', 'Tage seit Wartung', 'Intervall Monate', 'MCC / Tachymeter', 'Messstelle', 'Kabel', 'Bemerkung'].concat(xk);
     var rows = [head];
     (list || M.state.data.geraete).forEach(function (g) {
       var i = M.info(g.id), lv = i.posSrc === 'eigen' ? M.toLv95(i.pos.lat, i.pos.lng) : null;
       var link = g.typ === 'tachymeter' ? (M.mccOf(g.id) || {}).name : g.typ === 'mcc' ? (i.mccTs || {}).name : '';
       rows.push([g.name, M.typLabel[g.typ], i.kat ? i.kat.name : '', window.MonSym.GRUPPEN[i.gruppe].name, g.gtyp || '', g.hersteller || '', xlText(g.seriennummer),
         M.fmtDate(g.kaufdatum), g.wert, i.cur && !i.isMag ? M.amortText(i.cur) : '', M.num(g.amortVor) || 0, g.amortVorDatum ? M.fmtDate(g.amortVorDatum) : '', i.amortSum, i.nStandorte, i.restwert, i.ertrag, xlText(g.sim), g.zustand === 'ausgemustert' ? 'Ausgemustert' : M.stateLabel[i.state][0],
-        i.mccTs ? 'bei ' + i.mccTs.name : i.ortText, i.proj ? M.projName(i.proj) : '', i.cur && !i.isMag ? M.auftragOf(i.cur) : '',
+        i.mccTs ? 'bei ' + i.mccTs.name : i.ortText, i.proj ? M.projName(i.proj) : '', i.res ? M.projName(i.res.proj) + (i.res.ab ? ' ab ' + M.fmtDate(i.res.ab) : '') : '', i.cur && !i.isMag ? M.auftragOf(i.cur) : '',
         i.cur ? M.fmtDate(i.cur.von) : '', lv ? Math.round(lv.e) : '', lv ? Math.round(lv.n) : '',
         i.wart ? M.fmtDate(i.wart.letzte) : '', i.wart ? i.wart.tage : '', i.wart ? i.wart.intervall : '', link || '', i.ms ? i.ms.name : (i.members ? i.members.length + ' Geräte' : ''), i.kabel.length || '', g.bemerkung || ''
       ].concat(xk.map(function (k) { return g.extra ? g.extra[k] : ''; })));
@@ -448,6 +448,9 @@
     },
     'plan-mode': function (d) { M.planSetMode(d.p, d.k); },
     'bulk-plan': function () { M.openLaufzeit(selectedIds()); },
+    'bulk-res': function () { M.openReserve(selectedIds()); },
+    'reserve': function (d) { M.openReserve([d.id]); },
+    'res-clear': function () { M.clearReserve(); },
     'laufzeit': function (d) { M.openLaufzeit([d.id]); },
     'bulk-auftrag': function () { M.openAuftrag(selectedIds()); },
     'bulk-ms': function () { M.openMsNew(selectedIds()); },

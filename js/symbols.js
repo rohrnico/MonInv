@@ -70,6 +70,7 @@
     var fill = g.fill, ink = g.ink, edge = g.ink, edgeW = 1.3, dash = '', edgeOp = 0.55;
     if (st === 'ort') { fill = '#FFFFFF'; ink = '#A04500'; edge = '#F26B1D'; edgeW = 2; dash = ' stroke-dasharray="4 3"'; edgeOp = 1; }
     if (st === 'magazin') { fill = '#FFFFFF'; edgeW = 2; edgeOp = 1; }
+    if (st === 'reserviert') { fill = '#FFFFFF'; edge = '#00468E'; edgeW = 2.2; edgeOp = 1; dash = ' stroke-dasharray="5 2.5"'; }
     if (st === 'defekt') { fill = '#E5E5E4'; ink = '#5E5C5B'; edge = '#8A8887'; edgeOp = 1; }
     var shape = f.el.replace('/>', ' fill="' + fill + '" stroke="' + edge + '" stroke-opacity="' + edgeOp + '" stroke-width="' + edgeW + '" vector-effect="non-scaling-stroke"' + dash + '/>');
     var halo = opts.map ? f.el.replace('/>', ' fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>') : '';

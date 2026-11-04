@@ -1001,7 +1001,7 @@ form .posbox:not(:empty) { margin-top: 14px; }
 .ro [data-act="kabel-new"], .ro [data-act="kabel-from"], .ro [data-act="kabel-edit"], .ro [data-act="kabel-redraw"], .ro [data-act="kabel-del"],
 .ro [data-act="dup"], .ro [data-act="wartung"], .ro [data-act="edit-wartung"], .ro [data-act="edit-einsatz"], .ro [data-act="g-del-direct"],
 .ro [data-act="mcc-pick"], .ro [data-act="mcc-free"], .ro [data-act="ms-new"], .ro [data-act="ms-add"], .ro [data-act="ms-remove"], .ro [data-act="ms-dissolve"],
-.ro [data-act="labels"], .ro [data-act="pos-new"], .ro [data-act="new-proj"], .ro [data-act="edit-proj"], .ro [data-act="new-kat"],
+.ro [data-act="labels"], .ro [data-act="reserve"], .ro [data-act="pos-new"], .ro [data-act="new-proj"], .ro [data-act="edit-proj"], .ro [data-act="new-kat"],
 .ro [data-act="file-del"], .ro [data-act="et-settings-save"], .ro [data-act="et-settings-test"], .ro [data-act="clear-sample"], .ro [data-act="reset-sample"],
 .ro [data-act="csv-vorlage"], .ro label.file-btn, .ro .bulk, .ro .c-chk, .ro .inv-allm, .ro .dz, .ro label.file-in, .ro .ft-a select,
 .ro form[data-form="settings-wartung"] button[type=submit], .ro .pa-del, .ro .pa-grid { display: none !important; }
@@ -1066,3 +1066,10 @@ form .posbox:not(:empty) { margin-top: 14px; }
 .date-x { display: none; flex: none; width: 42px; border: 1px solid #C9C8C7; background: var(--weiss); color: var(--stein); font-size: 20px; line-height: 1; cursor: pointer; border-radius: 2px; }
 .date-x:hover { color: var(--rot); border-color: var(--rot); }
 .date-wrap.has-v .date-x { display: block; }
+
+/* Reservation (im Magazin, für ein Projekt vorgesehen) */
+.chip-res { background: var(--weiss); color: var(--blau); border: 1.5px dashed var(--blau); padding: 2px 7px; }
+.res-t { color: var(--blau); font-weight: 600; }
+.pi-r { margin-right: 6px; padding: 0 6px; border: 1.5px dashed var(--blau); border-radius: 9px; color: var(--blau); font: 700 11px/16px var(--f-head); }
+.res-chip { border-style: dashed; border-color: #8FB0D6; background: var(--himmel-2); }
+.res-chip .small { margin-left: 2px; }

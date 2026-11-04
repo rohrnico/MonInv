@@ -75,7 +75,7 @@
     bem: ['bemerkung'],
     wlan: ['wlan-passwort', 'wlan passwort', 'passphrase']
   };
-  var IGNORE = ['amortisiert total chf', 'standorte', 'restwert chf', 'ertrag über anschaffung chf', 'tage seit wartung', 'kabel'];
+  var IGNORE = ['amortisiert total chf', 'reserviert für', 'standorte', 'restwert chf', 'ertrag über anschaffung chf', 'tage seit wartung', 'kabel'];
 
   function norm(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
   function pd(s) {

@@ -616,6 +616,37 @@
   };
 
   /* ================================================== VERSCHIEBEN */
+  /* ================================================== RESERVIEREN (im Magazin, für ein Projekt vorgesehen) */
+  M.openReserve = function (ids) {
+    var I = M.idx();
+    var list = ids.map(function (id) { return I.ger[id]; }).filter(Boolean);
+    var mag = list.filter(function (g) { return M.info(g.id).isMag; }), andere = list.filter(function (g) { return !M.info(g.id).isMag; });
+    if (!mag.length) { M.toast('Reservieren geht nur für Geräte im Magazin. Geräte im Feld haben schon ein Projekt.', 'err'); return; }
+    var resv = mag.map(function (g) { return M.info(g.id).res; }), first = resv.find(Boolean) || null;
+    var same = first && resv.every(function (r) { return r && r.projektId === first.projektId; });
+    M.ctx = { kind: 'reserve', ids: mag.map(function (g) { return g.id; }) };
+    var b = mag.length === 1 ? '<div class="mv-from">' + M.symbol(mag[0].id, 32) + '<div><b>' + esc(mag[0].name) + '</b><span>' + esc(M.info(mag[0].id).ortText) + '</span></div></div>'
+      : '<p><b>' + mag.length + ' Geräte</b> im Magazin reservieren.</p><div class="dup-names">' + mag.slice(0, 30).map(function (g) { return '<span>' + esc(g.name) + '</span>'; }).join('') + (mag.length > 30 ? '<span>… +' + (mag.length - 30) + '</span>' : '') + '</div>';
+    if (andere.length) b += '<p class="hint small">' + andere.length + (andere.length === 1 ? ' Gerät ist' : ' Geräte sind') + ' nicht im Magazin und ' + (andere.length === 1 ? 'wird' : 'werden') + ' übersprungen: ' + esc(andere.slice(0, 6).map(function (g) { return g.name; }).join(', ')) + (andere.length > 6 ? ' …' : '') + '</p>';
+    b += M.projSelHtml('rs', same ? first.projektId : '').replace('Projekt (optional)', 'Reserviert für Projekt') + M.newProjBox('rs') +
+      '<div class="grid2">' + fld('Montage geplant ab (optional)', inp('rs-ab', same ? first.ab || '' : '', 'type="date"')) +
+      fld('Bemerkung (optional)', inp('rs-bem', same ? first.bemerkung || '' : '', 'maxlength="120" placeholder="z.B. für Etappe 2"')) + '</div>' +
+      '<p class="muted small">Die Geräte bleiben im Magazin und zählen nicht fürs Projekt (keine Amortisation, keine Abrechnung). Im Projekt erscheinen sie unter «Reserviert». Beim Platzieren ist das Projekt vorgewählt; mit dem Montieren endet die Reservation.</p>' +
+      '<p class="form-err" id="rs-err" role="alert"></p>';
+    M.modal({ title: 'Reservieren', form: 'reserve', body: b, foot: foot('Reservieren', first ? '<button type="button" class="btn ghost danger-t" data-act="res-clear">Reservation aufheben</button>' : '') });
+  };
+  M.submitReserve = function () {
+    var pid = val('rs-proj');
+    if (!pid || pid === M.NEU_PROJ) { $('rs-err').textContent = 'Bitte ein Projekt wählen.'; return; }
+    M.setReserve(M.ctx.ids, { projektId: pid, ab: val('rs-ab') || null, bemerkung: val('rs-bem') }).then(function (r) {
+      M.closeModal(); M.state.invSel = {}; M.refreshUI();
+      M.toast(r.n + (r.n === 1 ? ' Gerät' : ' Geräte') + ' reserviert für ' + M.projName(M.idx().proj[pid]));
+    });
+  };
+  M.clearReserve = function () {
+    M.setReserve(M.ctx.ids, null).then(function (r) { M.closeModal(); M.state.invSel = {}; M.refreshUI(); M.toast('Reservation aufgehoben' + (r.n ? ' (' + r.n + ')' : '')); });
+  };
+
   M.openMove = function (gids, onlyMag) {
     var I = M.idx();
     gids = gids.filter(function (id) { return !M.info(id).mccTs; });
@@ -623,7 +654,10 @@
     M.ctx = { kind: 'move', gids: gids };
     var one = gids.length === 1 ? I.ger[gids[0]] : null;
     var info = one ? M.info(one.id) : null;
-    var init = onlyMag ? { ort: 'magazin', magazinId: (M.magazine()[0] || {}).id } : (info && info.cur ? info.cur : { ort: 'feld' });
+    // reservierte Geräte: das reservierte Projekt ist vorgewählt (bei mehreren nur, wenn alle dasselbe haben)
+    var rs = gids.map(function (id) { return M.info(id).res; }), rs0 = rs[0];
+    var resInit = !onlyMag && rs0 && rs.every(function (r) { return r && r.projektId === rs0.projektId; }) ? { ort: 'feld', projektId: rs0.projektId } : null;
+    var init = onlyMag ? { ort: 'magazin', magazinId: (M.magazine()[0] || {}).id } : resInit || (info && info.cur ? info.cur : { ort: 'feld' });
     var hasMcc = gids.some(function (id) { var g = I.ger[id]; return g && g.typ === 'tachymeter' && g.mccId; });
     var b = '';
     if (one) b += '<div class="mv-from">' + M.symbol(one.id, 32) + '<div><b>' + esc(one.name) + '</b><span>Bisher: ' + esc(info.ortText) + (info.proj ? ' · Projekt ' + esc(M.projName(info.proj)) : '') + (info.cur ? ' · seit ' + M.fmtDate(info.cur.von) : '') + '</span></div></div>';
@@ -717,13 +751,13 @@
     gid = gid || (list.find(function (g) { return M.info(g.id).isMag; }) || list[0]).id;
     var g = I.ger[gid], i = M.info(gid), la = M.lastAmort(gid);
     M.ctx = { kind: 'place', gid: gid };
-    function group(label, arr) { return arr.length ? '<optgroup label="' + esc(label) + '">' + arr.map(function (x) { return opt(x.id, x.name + ' · ' + M.info(x.id).ortText, x.id === gid); }).join('') + '</optgroup>' : ''; }
+    function group(label, arr) { return arr.length ? '<optgroup label="' + esc(label) + '">' + arr.map(function (x) { var xi = M.info(x.id); return opt(x.id, x.name + ' · ' + xi.ortText + (xi.res ? ' · reserviert ' + M.projName(xi.res.proj) : ''), x.id === gid); }).join('') + '</optgroup>' : ''; }
     var mag = list.filter(function (x) { return M.info(x.id).isMag; }), feld = list.filter(function (x) { var ii = M.info(x.id); return ii.cur && !ii.isMag; }), ohne = list.filter(function (x) { return !M.info(x.id).cur; });
     var b = '<div class="mv-from">' + M.symbol(gid, 36) + '<div><b>' + esc(g.name) + '</b><span>Bisher: ' + esc(i.ortText) + (i.proj ? ' · Projekt ' + esc(M.projName(i.proj)) : '') + '</span></div></div>' +
       fld('Gerät', '<select id="pg-dev" data-change="pg-dev">' + group('Im Magazin', mag) + group('Im Feld', feld) + group('Ohne Standort', ohne) + '</select>') +
-      '<div class="grid2">' + M.projSelHtml('pg', i.proj ? i.proj.id : '') +
+      '<div class="grid2">' + M.projSelHtml('pg', i.proj ? i.proj.id : i.res ? i.res.proj.id : '') +
       fld('Datum', inp('pg-date', M.today(), 'type="date" data-change="plan-in" data-p="pg"')) + '</div>' + M.newProjBox('pg') +
-      '<div id="pg-posbox" class="posbox">' + M.posBoxHtml('pg', i.proj ? i.proj.id : '', i.cur || {}, 1) + '</div>' +
+      '<div id="pg-posbox" class="posbox">' + M.posBoxHtml('pg', i.proj ? i.proj.id : i.res ? i.res.proj.id : '', i.cur || {}, 1) + '</div>' +
       fld('Auftragsnummer / Teilprojekt (optional)', '<input id="pg-auftrag" list="auftrag-list" maxlength="40" placeholder="z.B. 26160-03" value="' + esc(i.cur && i.cur.auftrag || '') + '">' + M.auftragList()) +
       M.planBoxHtml('pg', {}) +
       amortFields('pg', { modus: la.modus, betrag: la.betrag }) +
@@ -1275,6 +1309,7 @@
     else if (f === 'auftrag') M.submitAuftrag();
     else if (f === 'position') M.submitPosition();
     else if (f === 'laufzeit') M.submitLaufzeit();
+    else if (f === 'reserve') M.submitReserve();
     else if (f === 'msnew') M.submitMsNew();
     else if (f === 'msadd') M.submitMsAdd();
     else if (f === 'msedit') M.submitGruppeEdit();

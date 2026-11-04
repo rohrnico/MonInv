@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.6.3';
+  M.VERSION = '0.6.4';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -274,6 +274,8 @@
     var isMag = !!(cur && cur.ort === 'magazin');
     var mag = isMag ? I.proj[cur.magazinId] || null : null;
     var proj = cur && cur.projektId ? I.proj[cur.projektId] || null : null;
+    // Reservation: im Magazin, aber schon einem Projekt zugeteilt (noch nicht montiert)
+    var res = isMag && cur.reserviert && cur.reserviert.projektId && I.proj[cur.reserviert.projektId] ? Object.assign({}, cur.reserviert, { proj: I.proj[cur.reserviert.projektId] }) : null;
     var pos = null, posSrc = null;
     if (isMag) { if (mag && M.has(mag.lat)) { pos = { lat: mag.lat, lng: mag.lng }; posSrc = 'magazin'; } }
     else if (cur && M.has(cur.lat)) { pos = { lat: cur.lat, lng: cur.lng }; posSrc = 'eigen'; }
@@ -315,14 +317,14 @@
     var state = 'ok';
     if (g.zustand === 'defekt' || g.zustand === 'ausgemustert') state = 'defekt';
     else if (wart && wart.faellig) state = 'wartung';
-    else if (isMag) state = 'magazin';
+    else if (isMag) state = res ? 'reserviert' : 'magazin';
     else if (ortFehlt) state = 'ort';
     else if (mccFehlt) state = 'mcc';
     var issue = state === 'wartung' || state === 'ort' || mccFehlt;
 
     var info = {
       g: g, kat: kat, gruppe: gruppe, pikto: pikto, kuerzel: kat ? kat.kuerzel : '',
-      cur: cur, proj: proj, mag: mag, isMag: isMag, pos: pos, posSrc: posSrc,
+      cur: cur, proj: proj, mag: mag, isMag: isMag, res: res, pos: pos, posSrc: posSrc,
       ortText: cur ? M.ortText(cur) : 'ohne Standort',
       eins: eins, amortSum: amortSum, nProjekte: Object.keys(projSet).length, nStandorte: nStandorte, restwert: restwert, ertrag: ertrag,
       wart: wart, state: state, issue: issue, ortFehlt: ortFehlt, mccFehlt: mccFehlt, mccTs: mccTs, members: members, ms: ms,
@@ -385,7 +387,7 @@
 
   M.stateLabel = {
     ok: ['Im Einsatz', 'chip-ok'], wartung: ['Wartung fällig', 'chip-warn'], ort: ['Position fehlt', 'chip-ort'],
-    magazin: ['Im Magazin', 'chip-mag'], defekt: ['Defekt', 'chip-off'], mcc: ['MCC fehlt', 'chip-warn']
+    magazin: ['Im Magazin', 'chip-mag'], reserviert: ['Reserviert', 'chip-res'], defekt: ['Defekt', 'chip-off'], mcc: ['MCC fehlt', 'chip-warn']
   };
   M.stateChip = function (gid) {
     var i = M.info(gid);
@@ -670,6 +672,25 @@
     }
     ids.forEach(function (id) { var g = I.ger[id]; if (!g) return; one(id); if (g.typ === 'tachymeter' && g.mccId) one(g.mccId); });
     return Promise.all(jobs);
+  };
+
+  /* Reservieren: Geräte im Magazin einem Projekt zuteilen (r = { projektId, ab, bemerkung }) oder freigeben (r = null).
+     Gespeichert am laufenden Magazin-Einsatz – kein neuer Eintrag in der Historie. Geräte einer Messstelle folgen. */
+  M.setReserve = function (ids, r) {
+    var I = M.idx(), jobs = [], n = 0, skip = [], done = {}, wer = M.userKuerzel();
+    function one(id) {
+      if (done[id]) return; done[id] = 1;
+      var g = I.ger[id]; if (!g) return;
+      var cur = (I.ein[id] || []).find(function (e) { return !e.bis; });
+      if (g.typ === 'messstelle') (I.members[id] || []).forEach(one);
+      if (!cur || cur.ort !== 'magazin') { if (g.typ !== 'messstelle') skip.push(g.name); return; }
+      var c = M.copy(cur);
+      if (r && r.projektId) c.reserviert = { projektId: r.projektId, ab: r.ab || null, bemerkung: r.bemerkung || '', wer: wer, datum: M.today() };
+      else { if (!cur.reserviert) return; delete c.reserviert; }
+      jobs.push(M.put('einsaetze', c)); if (g.typ !== 'messstelle') n++;
+    }
+    ids.forEach(one);
+    return Promise.all(jobs).then(function () { return { n: n, skip: skip }; });
   };
 
   /* Auftragsnummer am laufenden Einsatz setzen, ohne neuen Historien-Eintrag */
