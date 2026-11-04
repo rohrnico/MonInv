@@ -570,8 +570,8 @@
     var ohne = M.state.data.einsaetze.filter(function (e) { var g = I.ger[e.geraetId]; return e.projektId === p.id && !e.bis && e.ort === 'feld' && g && g.typ !== 'messstelle' && !(e.positionId && I.pos[e.positionId]); });
     var h = '<div class="sec-h" id="sec-pos"><span>Offerte &amp; Positionen</span><span class="grow"></span><button type="button" class="btn sm" data-act="pos-new" data-id="' + p.id + '">+ Position</button></div>';
     if (!ps.length) {
-      return h + '<div class="hint">Noch keine Positionen. Die Positionen der Offerte übernehmen: Nummer, Text, Preis pro Monat für <b>Vorhalten</b> (fliesst in die Amortisation), <b>Betrieb</b> (Lizenz, SIM) und <b>Wartung</b>. ' +
-        '<b>Set-Preis</b> für mehrere Geräte zu einem Preis (z.B. Gateway + 5 Nodes), <b>Stückpreis</b> für jedes Gerät einzeln. Danach die Geräte zuweisen.' + (ohne.length ? ' Zurzeit stehen ' + ohne.length + ' Geräte ohne Position im Projekt.' : '') + '</div>';
+      return h + '<div class="hint">Noch keine Offertpositionen. Die Positionen der Offerte übernehmen: Nummer, Text, Preis pro Monat für <b>Vorhalten</b> (fliesst in die Amortisation), <b>Betrieb</b> (Lizenz, SIM) und <b>Wartung</b>. ' +
+        '<b>Set-Preis</b> für mehrere Geräte zu einem Preis (z.B. Gateway + 5 Nodes), <b>Stückpreis</b> für jedes Gerät einzeln. Danach die Geräte zuweisen.' + (ohne.length ? ' Zurzeit stehen ' + ohne.length + ' Geräte ohne Offertposition im Projekt.' : '') + '</div>';
     }
     h += '<div class="tbl-wrap"><table class="tbl pos-tbl"><thead><tr><th>Pos.</th><th>Bezeichnung</th><th>Einheiten</th><th class="r">Vorhalten</th><th class="r">Betrieb</th><th class="r">Wartung</th><th class="r">Aktuell / Mt.</th><th class="pm-h">Monate: verrechnet · geplant · Offerte</th><th></th></tr></thead><tbody>';
     var grand = 0;
@@ -594,7 +594,7 @@
       h += '<tr class="pos-grp" style="--gc:' + G.c + ';--gl:' + G.l + '"><td colspan="6"><span class="sw"></span>' + esc(G.n) + ' <span class="muted">' + arr.length + (arr.length === 1 ? ' Position' : ' Positionen') + '</span></td><td class="r mono strong">' + M.chf(sub) + '</td><td></td><td></td></tr>' + rows;
     });
     h += '</tbody><tfoot><tr><td colspan="6">Total laufend (Einheiten × Preis pro Monat)</td><td class="r mono">CHF ' + M.chf(grand) + '</td><td></td><td></td></tr></tfoot></table></div>';
-    if (ohne.length) h += '<p class="hint small">' + ohne.length + (ohne.length === 1 ? ' Gerät steht' : ' Geräte stehen') + ' ohne Position im Projekt (' + esc(ohne.slice(0, 5).map(function (e) { return I.ger[e.geraetId].name; }).join(', ') + (ohne.length > 5 ? ' …' : '')) + '). Ohne Position ' + (ohne.length === 1 ? 'erscheint es' : 'erscheinen sie') + ' nicht in der Abrechnung (' + (ohne.length === 1 ? 'seine' : 'ihre') + ' Amortisation läuft weiter über den Einzelansatz). Zuweisen: Position anklicken › «Geräte».</p>';
+    if (ohne.length) h += '<p class="hint small">' + ohne.length + (ohne.length === 1 ? ' Gerät steht' : ' Geräte stehen') + ' ohne Offertposition im Projekt (' + esc(ohne.slice(0, 5).map(function (e) { return I.ger[e.geraetId].name; }).join(', ') + (ohne.length > 5 ? ' …' : '')) + '). Ohne Offertposition ' + (ohne.length === 1 ? 'erscheint es' : 'erscheinen sie') + ' nicht in der Abrechnung (' + (ohne.length === 1 ? 'seine' : 'ihre') + ' Amortisation läuft weiter über den Einzelansatz). Zuweisen: oben eine Offertposition anklicken › «Geräte im Projekt» ankreuzen. Das betrifft nur die Abrechnung – der Standort (LV95) ist davon unabhängig.</p>';
     return h;
   }
   function abrHtml(p) {

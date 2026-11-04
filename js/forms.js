@@ -190,7 +190,7 @@
     var pid = sel.positionId && I.pos[sel.positionId] ? sel.positionId : '';
     var P = pid ? I.pos[pid] : null;
     var h = fld('Offertposition', '<select id="' + p + '-pos" data-change="loc-pos" data-p="' + p + '" data-prev="' + pid + '">' +
-      opt('', ps.length ? '– keine Position –' : '– noch keine Positionen –', !pid) +
+      opt('', ps.length ? '– keine Offertposition –' : '– noch keine Offertpositionen –', !pid) +
       M.ABR_ORDER.map(function (g) {
         var arr = ps.filter(function (x) { return (x.gruppe || 'sen') === g; });
         return arr.length ? '<optgroup label="' + esc(M.ABR_GRUPPEN[g].n) + '">' + arr.map(function (x) { return opt(x.id, (x.nr ? x.nr + ' · ' : '') + x.text + (x.art === 'set' ? ' (Set)' : ''), x.id === pid); }).join('') + '</optgroup>' : '';
@@ -1031,7 +1031,7 @@
           var inPos = c.e.positionId === pid && pid, other = c.e.positionId && c.e.positionId !== pid && I.pos[c.e.positionId];
           var u = inPos ? M.unitOf(c.e) : null;
           return '<label class="chk po-dev"><input type="checkbox" data-change="po-dev" value="' + c.g.id + '"' + (inPos ? ' checked' : '') + ' data-wert="' + (M.num(c.g.wert) || 0) + '"> ' + M.symbol(c.g.id, 20) + '<b>' + esc(c.g.name) + '</b>' +
-            '<span class="muted small">' + (inPos ? (P.art === 'set' && u ? 'Set ' + u.nr : 'in dieser Position') : other ? 'jetzt Pos. ' + esc(other.nr || '?') : 'ohne Position') + (c.g.mccId && I.ger[c.g.mccId] ? ' · mit ' + esc(I.ger[c.g.mccId].name) : '') + '</span></label>';
+            '<span class="muted small">' + (inPos ? (P.art === 'set' && u ? 'Set ' + u.nr : 'in dieser Position') : other ? 'jetzt Pos. ' + esc(other.nr || '?') : 'ohne Offertposition') + (c.g.mccId && I.ger[c.g.mccId] ? ' · mit ' + esc(I.ger[c.g.mccId].name) : '') + '</span></label>';
         }).join('') + '</div>';
     }
     b += '</fieldset>' + fld('Bemerkung', '<textarea id="po-bem" rows="2">' + esc(d.bemerkung || '') + '</textarea>') + '<p class="form-err" id="po-err" role="alert"></p>';

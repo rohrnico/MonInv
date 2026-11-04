@@ -294,7 +294,7 @@
       var ps = posten.filter(function (x) { return x.g === g; }); if (!ps.length) return;
       var gs = { n: 0, v: 0, b: 0, w: 0, t: 0 };
       ps.forEach(function (x) {
-        var P = x.P, S = x.sum, base = [G[g].n, P ? P.nr || '' : '', P ? P.text : 'ohne Position (Einzelansatz)', P ? (x.rows[0] && x.rows[0].auftrag) || '' : '', P ? (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') : ''];
+        var P = x.P, S = x.sum, base = [G[g].n, P ? P.nr || '' : '', P ? P.text : 'ohne Offertposition (Einzelansatz)', P ? (x.rows[0] && x.rows[0].auftrag) || '' : '', P ? (P.art === 'set' ? 'Set-Preis' : 'Stückpreis') : ''];
         ['n', 'v', 'b', 'w', 't'].forEach(function (k) { gs[k] += S[k]; });
         rows.push(base.concat(['Total Position', '', '', '']).concat(S.per.map(function () { return ''; })).concat(['', P ? rd(M.num(P.V)) : '', P ? rd(M.num(P.B)) : '', P ? rd(M.num(P.W)) : '', rd(S.v), rd(S.b), rd(S.w), rd(S.t)]));
         x.rows.forEach(function (u) {
@@ -431,7 +431,7 @@
       var P = M.idx().pos[d.id]; if (!P) return;
       var n = M.state.data.einsaetze.filter(function (e) { return e.positionId === d.id; }).length;
       M.closeModal();
-      M.confirm('Position ' + (P.nr || '') + ' löschen?', (n ? n + ' Einsätze verweisen darauf. Sie bleiben in der Historie, rechnen danach aber ohne Position (Einzelansatz CHF 0). ' : '') + 'Das lässt sich nicht rückgängig machen.', 'Löschen', function () {
+      M.confirm('Position ' + (P.nr || '') + ' löschen?', (n ? n + ' Einsätze verweisen darauf. Sie bleiben in der Historie, rechnen danach aber ohne Offertposition (Einzelansatz CHF 0). ' : '') + 'Das lässt sich nicht rückgängig machen.', 'Löschen', function () {
         return M.deletePosition(d.id).then(function () { M.toast('Position gelöscht'); M.refreshUI(); });
       }, true);
     },
