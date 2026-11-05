@@ -651,6 +651,9 @@
     var all = []; ids.forEach(function (id) { var g = I.ger[id]; if (g && g.typ === 'messstelle') all = all.concat(I.members[id] || []); else all.push(id); });
     var es = M.histBulkPick(all);
     if (!es.length) { M.toast('Die gewählten Geräte haben noch keine Einsätze.', 'err'); return; }
+    // MCC zum Tachymeter (und umgekehrt) mitnehmen, wenn sie nicht schon gewählt ist
+    var drin = {}; es.forEach(function (e) { drin[e.geraetId] = 1; });
+    es.slice().forEach(function (e) { var pa = M.mccPartner(e); if (pa && !drin[pa.geraetId]) { drin[pa.geraetId] = 1; es.push(pa); } });
     var projs = {}; es.forEach(function (e) { projs[e.ort === 'feld' ? (e.projektId || '-') : 'mag'] = 1; });
     var oneProj = Object.keys(projs).length === 1 && es[0].ort === 'feld' && es[0].projektId ? es[0].projektId : '';
     M.ctx = { kind: 'histbulk', eids: es.map(function (e) { return e.id; }), n: es.length, hbProj: oneProj };
@@ -1223,12 +1226,38 @@
     return Object.keys(by).map(function (k) { return by[k].e; })
       .sort(function (a, b) { return String(I.ger[a.geraetId].name).localeCompare(String(I.ger[b.geraetId].name), 'de', { numeric: true }); });
   };
+  /* Einsatz der MCC zu einem Tachymeter-Einsatz (und umgekehrt): die MCC wechselt den Standort mit ihrem Tachymeter,
+     ihre Einsätze beginnen deshalb am gleichen Tag am gleichen Ort. Gesucht wird beim aktuell zugeordneten Partner
+     (gleicher Ort, zeitlich überlappend) und bei allen übrigen MCC bzw. Tachymetern (gleicher Beginn, gleicher Ort). */
+  function gleicherOrt(a, b) {
+    return a.ort === b.ort && (a.projektId || null) === (b.projektId || null) && (a.magazinId || null) === (b.magazinId || null) &&
+      (!M.has(a.lat) || !M.has(b.lat) || M.dist([a.lat, a.lng], [b.lat, b.lng]) < 5);
+  }
+  M.mccPartner = function (e) {
+    var I = M.idx(), g = e && I.ger[e.geraetId];
+    if (!g || (g.typ !== 'tachymeter' && g.typ !== 'mcc')) return null;
+    var other = g.typ === 'tachymeter' ? 'mcc' : 'tachymeter';
+    var cur = g.typ === 'tachymeter' ? g.mccId : I.tsOfMcc[g.id];
+    var best = null, bestD = 1e9;
+    M.state.data.einsaetze.forEach(function (x) {
+      var og = I.ger[x.geraetId];
+      if (!og || og.typ !== other || x.id === e.id || !gleicherOrt(x, e)) return;
+      var d = Math.abs(M.days(x.von, e.von));
+      var ok = x.geraetId === cur ? (x.von < (e.bis || '9999') && (x.bis || '9999') > e.von) || d === 0 : d === 0;
+      if (!ok) return;
+      if (x.geraetId === cur) d -= 0.5;   // bei Gleichstand der zugeordnete Partner
+      if (d < bestD) { best = x; bestD = d; }
+    });
+    return best;
+  };
   M.openEinsatz = function (eid) {
     var e = M.state.data.einsaetze.find(function (x) { return x.id === eid; });
     if (!e) return;
     var g = M.idx().ger[e.geraetId];
-    var sibs = M.setSiblings(e);
-    M.ctx = { kind: 'einsatz', eid: eid, sibs: sibs.map(function (x) { return x.id; }) };
+    var sibs = M.setSiblings(e), pa = M.mccPartner(e);
+    if (pa && !sibs.some(function (x) { return x.geraetId === pa.geraetId; })) sibs = [pa].concat(sibs);
+    else if (pa) sibs = sibs.map(function (x) { return x.geraetId === pa.geraetId ? pa : x; });
+    M.ctx = { kind: 'einsatz', eid: eid, sibs: sibs.map(function (x) { return x.id; }), partner: pa ? pa.id : null };
     var b = '<div class="mv-from">' + M.symbol(g.id, 32) + '<div><b>' + esc(g.name) + '</b><span>Einsatz korrigieren</span></div></div>' +
       locFields('el', e, { later: false, amort: { edit: true, modus: e.amortModus, betrag: e.amortBetrag } }) + '<div class="grid2">' +
       fld('Von', inp('e-von', e.von, 'type="date" required data-change="plan-in" data-p="el"')) +
@@ -1237,30 +1266,39 @@
       fld('Gesetzt von', inp('e-ges', e.gesetztVon, 'maxlength="40"')) +
       fld('Geholt von', inp('e-geh', e.geholtVon, 'maxlength="40"')) + '</div>' +
       fld('Bemerkung', '<textarea id="e-bem" rows="2">' + esc(e.bemerkung || '') + '</textarea>', 'full') +
-      (sibs.length ? setBox(e, sibs) : '') +
+      (sibs.length ? setBox(e, sibs, pa) : '') +
       '<p class="form-err" id="e-err" role="alert"></p>';
     M.modal({ title: 'Einsatz bearbeiten', form: 'einsatz', wide: true, body: b, foot: foot('Speichern', '<button type="button" class="btn ghost danger-t" data-act="e-del">Löschen</button>') });
   };
-  function setBox(e, sibs) {
+  function setBox(e, sibs, pa) {
     var I = M.idx(), P = e.positionId ? I.pos[e.positionId] : null;
-    return '<fieldset class="extra set-apply"><legend>Set' + (P ? ' · ' + esc(M.posLabel(P)) : '') + '</legend>' +
-      '<label class="chk"><input type="checkbox" id="e-set-on" checked data-change="e-set-on"> <span><b>Änderungen auch für die anderen ' + sibs.length + (sibs.length === 1 ? ' Gerät' : ' Geräte') + ' im Set übernehmen</b></span></label>' +
+    var nurPaar = pa && sibs.length === 1, g = I.ger[e.geraetId];
+    var lg = nurPaar ? (g.typ === 'mcc' ? 'MCC mit Tachymeter' : 'Tachymeter mit MCC') : 'Set' + (P ? ' · ' + esc(M.posLabel(P)) : '');
+    var tx = nurPaar ? 'Änderungen auch für ' + (g.typ === 'mcc' ? 'den Tachymeter ' : 'die MCC ') + esc(I.ger[pa.geraetId].name) + ' übernehmen'
+      : 'Änderungen auch für die anderen ' + sibs.length + (sibs.length === 1 ? ' Gerät' : ' Geräte') + (P ? ' im Set' : '') + ' übernehmen';
+    return '<fieldset class="extra set-apply"><legend>' + lg + '</legend>' +
+      '<label class="chk"><input type="checkbox" id="e-set-on" checked data-change="e-set-on"> <span><b>' + tx + '</b></span></label>' +
       '<div class="set-devs" id="e-set-devs">' + sibs.map(function (x) {
         var g = I.ger[x.geraetId];
         return '<label class="chk"><input type="checkbox" class="e-set-dev" value="' + x.id + '" checked> ' + M.symbol(g.id, 18) + ' <b>' + esc(g.name) + '</b> <span class="muted small">' + M.fmtDate(x.von) + ' – ' + (x.bis ? M.fmtDate(x.bis) : 'laufend') + '</span></label>';
       }).join('') + '</div>' +
-      '<p class="muted small">Übernommen wird nur, was hier geändert wird: Von, Bis, Standort/Projekt, Auftrag, Offertposition/Set, geplante Laufzeit, Gesetzt/Geholt von, Bemerkung. Die Position (LV95) bleibt je Gerät.</p></fieldset>';
+      '<p class="muted small">Übernommen wird nur, was hier geändert wird: Von, Bis, Standort/Projekt, Auftrag, Offertposition/Set, geplante Laufzeit, Gesetzt/Geholt von, Bemerkung. ' +
+      (pa ? 'Die ' + (g.typ === 'mcc' ? 'MCC und ihr Tachymeter teilen' : 'MCC teilt mit dem Tachymeter') + ' auch die Position' + (nurPaar ? '' : ', bei den übrigen Geräten bleibt sie je Gerät') + '.' : 'Die Position (LV95) bleibt je Gerät.') + '</p></fieldset>';
   }
   /* geänderte Felder eines Einsatzes auf die Set-Geschwister übertragen; liefert Jobs und übersprungene Geräte */
   var SET_FIELDS = ['von', 'bis', 'ort', 'magazinId', 'projektId', 'auftrag', 'positionId', 'einheit', 'amortModus', 'amortBetrag', 'planBis', 'planMonate', 'gesetztVon', 'geholtVon', 'bemerkung'];
-  M.applyToSet = function (orig, neu, sibIds) {
+  var POS_FIELDS = ['lat', 'lng', 'ortName'];
+  M.applyToSet = function (orig, neu, sibIds, partnerId) {
     var I = M.idx(), jobs = [], skip = [], n = 0;
-    var changed = SET_FIELDS.filter(function (f) { return String(orig[f] === undefined || orig[f] === null ? '' : orig[f]) !== String(neu[f] === undefined || neu[f] === null ? '' : neu[f]); });
-    if (!changed.length) return { jobs: jobs, skip: skip, n: 0, changed: changed };
+    function diff(f) { return String(orig[f] === undefined || orig[f] === null ? '' : orig[f]) !== String(neu[f] === undefined || neu[f] === null ? '' : neu[f]); }
+    var changed = SET_FIELDS.filter(diff), posCh = POS_FIELDS.filter(diff);
+    if (!changed.length && !(partnerId && posCh.length)) return { jobs: jobs, skip: skip, n: 0, changed: changed };
     sibIds.forEach(function (sid) {
       var x = M.state.data.einsaetze.find(function (y) { return y.id === sid; }); if (!x) return;
       var c = M.copy(x), g = I.ger[x.geraetId];
-      changed.forEach(function (f) { c[f] = neu[f] === undefined ? null : neu[f]; });
+      var fs = sid === partnerId ? changed.concat(posCh) : changed;
+      if (!fs.length) return;
+      fs.forEach(function (f) { c[f] = neu[f] === undefined ? null : neu[f]; });
       if (changed.indexOf('planMonate') >= 0 || changed.indexOf('von') >= 0) { if (c.planMonate) c.planBis = M.addMonths(c.von, c.planMonate); }
       if (c.ort !== 'feld') { c.lat = null; c.lng = null; c.ortName = ''; c.positionId = null; c.einheit = null; c.planBis = null; c.planMonate = null; }
       if (c.bis && c.bis < c.von) { skip.push(g.name + ' («Bis» vor «Von»)'); return; }
@@ -1300,10 +1338,11 @@
     var origCopy = M.copy(orig);
     M.put('einsaetze', e).then(function () {
       if (e.ort === 'feld' && M.has(e.lat) && !e.ortName) M.fillOrtName(e.id);
-      var r = sibIds.length ? M.applyToSet(origCopy, e, sibIds) : { jobs: [], skip: [], n: 0 };
+      var pid = M.ctx.partner, r = sibIds.length ? M.applyToSet(origCopy, e, sibIds, pid) : { jobs: [], skip: [], n: 0 };
+      var nurPaar = pid && sibIds.length === 1 && sibIds[0] === pid;
       return Promise.all(r.jobs).then(function () {
         M.closeModal(); M.refreshUI();
-        M.toast('Einsatz gespeichert' + (r.n ? ' · ' + r.n + (r.n === 1 ? ' weiteres Gerät' : ' weitere Geräte') + ' im Set angepasst' : ''));
+        M.toast('Einsatz gespeichert' + (r.n ? ' · ' + (nurPaar ? (M.idx().ger[origCopy.geraetId].typ === 'mcc' ? 'Tachymeter' : 'MCC') + ' angepasst' : r.n + (r.n === 1 ? ' weiteres Gerät' : ' weitere Geräte') + ' angepasst') : ''));
         if (r.skip.length) M.toast('Nicht übernommen: ' + r.skip.join(', '), 'err');
       });
     });
