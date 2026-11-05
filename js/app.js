@@ -903,7 +903,16 @@
     return M.store.load().then(function (data) {
       M.setData(data);
       M.refreshUI();
+      M.cleanupDups();
     });
+  };
+  /* Doppelte SharePoint-Zeilen (gleicher Datensatz zweimal gespeichert) im Hintergrund entfernen.
+     Angezeigt wird ohnehin nur die zuletzt geänderte Zeile. */
+  M.cleanupDups = function () {
+    if (!M.store.dupCount || !M.store.dupCount() || !M.can('edit')) return;
+    M.store.cleanupDups().then(function (n) {
+      if (n) M.toast(n + (n === 1 ? ' doppelte Zeile' : ' doppelte Zeilen') + ' in SharePoint aufgeräumt');
+    }).catch(function (e) { console.warn('MonInv: Doppel nicht aufgeräumt', e); });
   };
 
   function boot() {
@@ -920,6 +929,7 @@
       M.go(VIEWS.indexOf(v) >= 0 ? v : 'karte', false);
       if (M.pendingOpen) setTimeout(M.pendingOpen, 80);   // Link aus einem QR-Etikett
       setTimeout(M.fillMissingOrt, 1500);
+      setTimeout(M.cleanupDups, 2500);
       // Neue Version aufgeschaltet? (version.txt liegt neben index.html)
       var checkVer = function () {
         if (location.protocol === 'file:') return;
@@ -935,11 +945,15 @@
       if (M.store.mode === 'sharepoint') {
         var sec = (cfg.sharepoint && cfg.sharepoint.aktualisierenSekunden) || 60;
         var poll = function () {
-          if (document.hidden || M.modalOpen() || M.state.placing || M.state.drawing) return;
+          // nicht während noch gespeichert wird – sonst überschreibt der ältere Stand vom Server die eigenen Änderungen
+          if (document.hidden || M.modalOpen() || M.state.placing || M.state.drawing || (M.store.busy && M.store.busy())) return;
+          var seq = M.store.seq;
           M.store.refresh().then(function (d) {
             if (!d) return;
             M.normalize(d);
+            if ((M.store.busy && M.store.busy()) || M.store.seq !== seq) return;   // während des Ladens gespeichert: nächste Runde
             if (JSON.stringify(d) !== JSON.stringify(M.state.data)) { M.state.data = d; M.bump(); M.refreshUI(); }
+            M.cleanupDups();
           }).catch(function (e) { console.warn(e); });
         };
         setInterval(poll, sec * 1000);

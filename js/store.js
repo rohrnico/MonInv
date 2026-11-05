@@ -107,6 +107,11 @@
     this.siteId = null;
     this.lists = {};      // col → listId
     this.items = {};      // col → { recordId → itemId }
+    this.queue = {};      // 'col|recordId' → laufendes Speichern (Schreiben pro Datensatz nacheinander)
+    this.pending = 0;     // Anzahl laufender Schreibvorgänge
+    this.seq = 0;         // zählt jedes Speichern/Löschen (Abgleich: während des Ladens geändert?)
+    this.created = {};    // 'col|recordId' → { itemId, t } eben neu angelegte Zeilen
+    this.dups = {};       // col → [{ id, itemId }] doppelte SharePoint-Zeilen mit gleicher Datensatz-ID
     this.account = null;
     this.userName = '';
     this.data = emptyData();
@@ -333,7 +338,7 @@
   };
 
   SharePointStore.prototype._loadList = function (col) {
-    var self = this, out = [], map = {};
+    var self = this, out = [], map = {}, mod = {}, pos = {}, dups = [], t0 = Date.now();
     var url = '/sites/' + this.siteId + '/lists/' + this.lists[col] + '/items?$expand=fields($select=Title,Daten)&$top=999';
     function page(u) {
       return self._graph('GET', u).then(function (r) {
@@ -342,14 +347,48 @@
           try {
             var rec = JSON.parse(f.Daten || '{}');
             rec.id = rec.id || f.Title;
-            if (rec.id) { out.push(rec); map[rec.id] = it.id; }
+            if (!rec.id) return;
+            var t = it.lastModifiedDateTime || '';
+            // Dieselbe Datensatz-ID in mehreren Zeilen (früher beim schnellen Nachspeichern entstanden):
+            // die zuletzt geänderte Zeile gilt, die übrigen werden zum Aufräumen vorgemerkt.
+            if (map[rec.id]) {
+              if (t > mod[rec.id]) { dups.push({ id: rec.id, itemId: map[rec.id] }); out[pos[rec.id]] = rec; map[rec.id] = it.id; mod[rec.id] = t; }
+              else dups.push({ id: rec.id, itemId: it.id });
+              return;
+            }
+            pos[rec.id] = out.length; out.push(rec); map[rec.id] = it.id; mod[rec.id] = t;
           } catch (e) { /* defekte Zeile überspringen */ }
         });
         if (r['@odata.nextLink']) return page(r['@odata.nextLink']);
       });
     }
-    return page(url).then(function () { self.items[col] = map; return out; });
+    return page(url).then(function () {
+      // während des Ladens neu angelegte Zeilen nicht vergessen – sonst würde das nächste Speichern sie nochmals anlegen
+      Object.keys(self.created).forEach(function (k) {
+        var c = self.created[k], i = k.indexOf('|');
+        if (k.slice(0, i) === col && c.t >= t0 - 5000 && !map[k.slice(i + 1)]) map[k.slice(i + 1)] = c.itemId;
+        if (c.t < t0 - 60000) delete self.created[k];
+      });
+      self.items[col] = map; self.dups[col] = dups; return out;
+    });
   };
+
+  /* Doppelte Zeilen (gleiche Datensatz-ID) aus den SharePoint-Listen entfernen */
+  SharePointStore.prototype.dupCount = function () {
+    var self = this, n = 0;
+    Object.keys(this.dups).forEach(function (c) { n += (self.dups[c] || []).length; });
+    return n;
+  };
+  SharePointStore.prototype.cleanupDups = function () {
+    var self = this, jobs = [];
+    Object.keys(this.dups).forEach(function (c) {
+      (self.dups[c] || []).forEach(function (d) {
+        jobs.push(self._graph('DELETE', '/sites/' + self.siteId + '/lists/' + self.lists[c] + '/items/' + d.itemId).catch(function (e) { if (e.status !== 404) throw e; }));
+      });
+    });
+    return Promise.all(jobs).then(function () { var n = jobs.length; self.dups = {}; return n; });
+  };
+  SharePointStore.prototype.busy = function () { return this.pending > 0; };
 
   SharePointStore.prototype.load = function () {
     var self = this;
@@ -362,24 +401,42 @@
   };
   SharePointStore.prototype.refresh = SharePointStore.prototype.load;
 
+  /* Schreibvorgänge pro Datensatz nacheinander: Ein zweites Speichern (z.B. Ortsname nachtragen) wartet,
+     bis das erste fertig ist – sonst kennt es die neue SharePoint-Zeile noch nicht und legt sie doppelt an. */
+  SharePointStore.prototype._serial = function (col, id, fn) {
+    var self = this, key = col + '|' + id;
+    var prev = this.queue[key] || Promise.resolve();
+    this.pending++; this.seq++;
+    var run = prev.catch(function () { /* voriger Fehler ist schon gemeldet */ }).then(fn);
+    var done = run.then(function () {}, function () {});
+    this.queue[key] = done;
+    done.then(function () { self.pending--; if (self.queue[key] === done) delete self.queue[key]; });
+    return run;
+  };
+
   SharePointStore.prototype.save = function (col, rec) {
-    var self = this;
-    var itemId = this.items[col] && this.items[col][rec.id];
-    var base = '/sites/' + this.siteId + '/lists/' + this.lists[col] + '/items';
-    var fields = { Title: rec.id, Daten: JSON.stringify(rec) };
-    if (itemId) return this._graph('PATCH', base + '/' + itemId + '/fields', fields);
-    return this._graph('POST', base, { fields: fields }).then(function (it) {
-      self.items[col] = self.items[col] || {};
-      self.items[col][rec.id] = it.id;
+    var self = this, data = JSON.stringify(rec);
+    return this._serial(col, rec.id, function () {
+      var itemId = self.items[col] && self.items[col][rec.id];
+      var base = '/sites/' + self.siteId + '/lists/' + self.lists[col] + '/items';
+      var fields = { Title: rec.id, Daten: data };
+      if (itemId) return self._graph('PATCH', base + '/' + itemId + '/fields', fields);
+      return self._graph('POST', base, { fields: fields }).then(function (it) {
+        self.items[col] = self.items[col] || {};
+        self.items[col][rec.id] = it.id;
+        self.created[col + '|' + rec.id] = { itemId: it.id, t: Date.now() };
+      });
     });
   };
 
   SharePointStore.prototype.remove = function (col, id) {
-    var itemId = this.items[col] && this.items[col][id];
-    if (!itemId) return Promise.resolve();
     var self = this;
-    return this._graph('DELETE', '/sites/' + this.siteId + '/lists/' + this.lists[col] + '/items/' + itemId)
-      .then(function () { delete self.items[col][id]; });
+    return this._serial(col, id, function () {
+      var itemId = self.items[col] && self.items[col][id];
+      if (!itemId) return;
+      return self._graph('DELETE', '/sites/' + self.siteId + '/lists/' + self.lists[col] + '/items/' + itemId)
+        .then(function () { delete self.items[col][id]; delete self.created[col + '|' + id]; });
+    });
   };
 
   /* Import (z.B. Umzug vom Testbetrieb): schreibt alle Datensätze, bestehende werden überschrieben. */
