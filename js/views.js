@@ -119,7 +119,8 @@
     } else {
       var len = M.lineLen(dr.pts), I = M.idx();
       var links = [dr.zuId && I.ger[dr.zuId] ? I.ger[dr.zuId].name : null, dr.vonId && I.ger[dr.vonId] ? I.ger[dr.vonId].name : null].filter(Boolean);
-      h += '<div class="pl-t"><b>Kabel zeichnen</b> – Punkte entlang der Kabelführung in die Karte tippen. Ein Gerät antippen verbindet das Kabel damit.</div>' +
+      (dr.kabelAn || []).forEach(function (a) { var k = I.kab[a.kid], nm = k && (k.name || (M.kabelTypen[k.typ] || M.kabelTypen.andere).name); if (nm && links.indexOf(nm) < 0) links.push(nm); });
+      h += '<div class="pl-t"><b>Kabel zeichnen</b> – Punkte entlang der Kabelführung in die Karte tippen. Ein Gerät antippen verbindet das Kabel damit, ein bestehendes Kabel antippen setzt den Punkt genau auf dieses Kabel (Abzweigung).</div>' +
         '<div class="pl-info"><span>' + dr.pts.length + ' Punkte</span><span class="mono">' + M.fmtLen(len) + '</span>' + (links.length ? '<span>verbunden: ' + esc(links.join(' ↔ ')) + '</span>' : '') + '</div>' +
         '<div class="pl-b"><button type="button" class="btn sm ghost" data-act="draw-undo"' + (dr.pts.length ? '' : ' disabled') + '>Rückgängig</button>' +
         '<button type="button" class="btn sm ghost" data-act="draw-cancel">Abbrechen</button>' +

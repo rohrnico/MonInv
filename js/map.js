@@ -121,11 +121,34 @@
       var casing = L.polyline(k.punkte, { color: '#FFFFFF', weight: sel ? 9 : 6, opacity: 0.9, interactive: false });
       var line = L.polyline(k.punkte, { color: sel ? '#D9590B' : t.color, weight: sel ? 5 : 3, dashArray: t.dash, opacity: 1 });
       var hit = L.polyline(k.punkte, { color: '#000', weight: 16, opacity: 0 });
-      hit.on('click', function (e) { L.DomEvent.stop(e); if (M.state.placing || M.state.drawing) return; M.selectKabel(k.id); });
+      hit.on('click', function (e) {
+        L.DomEvent.stop(e);
+        if (M.state.drawing) { var sp = snapToLine(k.punkte, e.latlng); M.drawAdd(sp[0], sp[1], null, k.id); return; }
+        if (M.state.placing) { M.placeAt(e.latlng.lat, e.latlng.lng); return; }
+        M.selectKabel(k.id);
+      });
       hit.bindTooltip(M.esc(k.name || t.name) + ' · ' + M.fmtLen(M.lineLen(k.punkte)), { sticky: true, direction: 'top' });
       kabelLayer.addLayer(casing); kabelLayer.addLayer(line); kabelLayer.addLayer(hit);
       lines[k.id] = line;
     });
+  }
+
+  /* Punkt auf ein bestehendes Kabel ziehen: nahe einem Knick genau auf den Knick, sonst auf die Linie (lotrecht) */
+  function snapToLine(pts, ll) {
+    var p = map.latLngToLayerPoint(ll), best = null, bd = Infinity, i;
+    for (i = 0; i < pts.length; i++) {
+      var v = map.latLngToLayerPoint(L.latLng(pts[i])), dv = v.distanceTo(p);
+      if (dv < 14 && dv < bd) { bd = dv; best = pts[i]; }
+    }
+    if (best) return [best[0], best[1]];
+    for (i = 0; i < pts.length - 1; i++) {
+      var a = map.latLngToLayerPoint(L.latLng(pts[i])), b = map.latLngToLayerPoint(L.latLng(pts[i + 1]));
+      var c = L.LineUtil.closestPointOnSegment(p, a, b), dc = c.distanceTo(p);
+      if (dc < bd) { bd = dc; best = c; }
+    }
+    if (!best) return [ll.lat, ll.lng];
+    var q = map.layerPointToLatLng(best);
+    return [q.lat, q.lng];
   }
 
   M.mapUpdate = function () {
@@ -240,10 +263,11 @@
   }
   M.drawRender = renderDraw;
 
-  M.drawAdd = function (lat, lng, gid) {
+  M.drawAdd = function (lat, lng, gid, kid) {
     var d = M.state.drawing;
     if (!d) return;
     d.pts.push([lat, lng]);
+    if (kid) { d.kabelAn = d.kabelAn || []; d.kabelAn.push({ kid: kid, n: d.pts.length - 1 }); }
     if (gid) {
       if (!d.zuId) d.zuId = gid;
       else if (gid !== d.zuId) d.vonId = gid;

@@ -650,7 +650,7 @@
         return M.del('kabel', k.id).then(function () { M.toast('Kabel gelöscht'); });
       }, true);
     },
-    'draw-undo': function () { var dr = M.state.drawing; if (!dr) return; dr.pts.pop(); M.drawRender(); M.renderPlacing(); },
+    'draw-undo': function () { var dr = M.state.drawing; if (!dr) return; dr.pts.pop(); if (dr.kabelAn) dr.kabelAn = dr.kabelAn.filter(function (a) { return a.n < dr.pts.length; }); M.drawRender(); M.renderPlacing(); },
     'draw-cancel': function () { M.state.drawing = null; M.renderPlacing(); M.mapUpdate(); },
     'draw-done': function () { M.finishDrawing(); },
     'w-del': function () {
