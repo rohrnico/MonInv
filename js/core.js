@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.7.12';
+  M.VERSION = '0.7.13';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -402,6 +402,28 @@
     var i = M.info(gid);
     var s = i.g.zustand === 'ausgemustert' ? ['Ausgemustert', 'chip-off'] : i.state === 'ok' && i.lz && i.lz.warn ? ['Abbau fällig', 'chip-warn'] : M.stateLabel[i.state];
     return '<span class="chip ' + s[1] + '">' + s[0] + '</span>';
+  };
+  /* Warnungen eines Geräts auf der Karte (Handlungsbedarf), inkl. der MCC beim Tachymeter und der Geräte
+     einer Messstelle, die bei ihr stehen – diese erscheinen nicht einzeln auf der Karte. */
+  M.warnings = function (i, nested) {
+    var out = [], g = i.g;
+    if (i.state !== 'defekt') {
+      if (i.wart && i.wart.faellig) out.push('Wartung fällig');
+      if (i.ortFehlt) out.push('Position fehlt');
+      if (i.mccFehlt) out.push('MCC fehlt');
+      if (i.lz && i.lz.warn) out.push('Abbau fällig (Laufzeit laut Offerte)');
+    }
+    if (nested) return out;
+    var pre = function (name, arr) { return arr.map(function (w) { return name + ': ' + w; }); };
+    if (g.typ === 'tachymeter' && g.mccId && M.idx().ger[g.mccId]) {
+      var mi = M.info(g.mccId);
+      if (mi && !mi.isMag) out = out.concat(pre(mi.g.name, M.warnings(mi, true)));
+    }
+    if (i.members) i.members.forEach(function (m) {
+      var mi = M.info(m);
+      if (mi && mi.msBei) out = out.concat(pre(mi.g.name, M.warnings(mi, true)));
+    });
+    return out;
   };
   M.typLabel = { sensor: 'Sensor', tachymeter: 'Tachymeter', mcc: 'MCC TSC', messstelle: 'Messstelle' };
   M.isGeraet = function (g) { return g && g.typ !== 'messstelle'; };

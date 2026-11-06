@@ -25,7 +25,7 @@
     var counts = {}, issues = 0, n = kids.length, mag = 0;
     kids.forEach(function (m) {
       counts[m.options.gruppe] = (counts[m.options.gruppe] || 0) + 1;
-      if (m.options.issue) issues++;
+      issues += m.options.nWarn || 0;
       if (m.options.mag) mag++;
     });
     var acc = 0, parts = [];
@@ -100,13 +100,16 @@
     if (f.off[i.gruppe]) return false;
     if (i.isMag && !f.magazin) return false;
     if (!i.isMag && !f.feld) return false;
-    if (f.issue && !i.issue) return false;
+    if (f.issue && !i.issue && !M.warnings(i).length) return false;
     if (f.projekt && (!i.proj || i.proj.id !== f.projekt)) return false;
     return true;
   };
 
-  function markerIcon(i, sel) {
-    var html = M.symbol(i.g.id, 30, { map: true }) + '<span class="mk-lab">' + M.esc(i.g.name) + (i.g.mccId ? ' + MCC ' + M.esc(M.mccKurz(i.g.mccId)) : '') + (i.members ? ' · ' + i.members.length + (i.members.length === 1 ? ' Gerät' : ' Geräte') : '') + '</span>';
+  function markerIcon(i, sel, warn) {
+    warn = warn || [];
+    var html = M.symbol(i.g.id, 30, { map: true }) +
+      (warn.length ? '<span class="mk-badge" title="' + M.esc(warn.join(' · ')) + '">' + warn.length + '</span>' : '') +
+      '<span class="mk-lab">' + M.esc(i.g.name) + (i.g.mccId ? ' + MCC ' + M.esc(M.mccKurz(i.g.mccId)) : '') + (i.members ? ' · ' + i.members.length + (i.members.length === 1 ? ' Gerät' : ' Geräte') : '') + '</span>';
     return L.divIcon({ html: html, className: 'mk' + (sel ? ' mk-sel' : ''), iconSize: [36, 36], iconAnchor: [18, 18] });
   }
 
@@ -161,10 +164,11 @@
     M.state.data.geraete.forEach(function (g) {
       var i = M.info(g.id);
       if (!M.mapFilter(i)) return;
+      var warn = M.warnings(i);
       var m = L.marker([i.pos.lat, i.pos.lng], {
-        icon: markerIcon(i, M.state.sel === g.id),
-        gruppe: i.gruppe, issue: i.issue, mag: i.isMag, gid: g.id,
-        title: g.name, keyboard: true, riseOnHover: true
+        icon: markerIcon(i, M.state.sel === g.id, warn),
+        gruppe: i.gruppe, issue: i.issue, nWarn: warn.length, mag: i.isMag, gid: g.id,
+        title: g.name + (warn.length ? ' – ' + warn.join(' · ') : ''), keyboard: true, riseOnHover: true
       });
       m.on('click', function () {
         if (M.state.drawing) { M.drawAdd(i.pos.lat, i.pos.lng, g.id); return; }
@@ -185,7 +189,7 @@
 
   M.mapMarkSel = function (prev, next) {
     [prev, next].forEach(function (id) {
-      if (id && markers[id]) markers[id].setIcon(markerIcon(M.info(id), id === next));
+      if (id && markers[id]) markers[id].setIcon(markerIcon(M.info(id), id === next, M.warnings(M.info(id))));
     });
   };
   M.mapRedrawKabel = function () { if (map) drawKabel(); };
