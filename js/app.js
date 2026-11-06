@@ -476,6 +476,8 @@
     'res-clear': function () { M.clearReserve(); },
     'laufzeit': function (d) { M.openLaufzeit([d.id]); },
     'bulk-auftrag': function () { M.openAuftrag(selectedIds()); },
+    'bulk-poswahl': function () { M.openPosWahl(selectedIds()); },
+    'pos-wahl': function (d) { M.openPosWahl([d.id]); },
     'bulk-ms': function () { M.openMsNew(selectedIds()); },
     'ms-new': function (d) { M.openMsNew(String(d.ids || '').split(',').filter(Boolean)); },
     'ms-add': function (d) { M.openMsAdd(d.id); },

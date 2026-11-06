@@ -1152,6 +1152,49 @@
     M.setAuftrag(ids, nr).then(function () { M.state.invSel = {}; M.toast((nr ? 'Teilprojekt ' + nr : 'Teilprojekt entfernt') + ' · ' + ids.length + (ids.length === 1 ? ' Gerät' : ' Geräte')); M.refreshUI(); });
   };
 
+  /* ================================================== OFFERTPOSITION WÄHLEN (ein oder mehrere Geräte)
+     Gilt für den laufenden Einsatz im Feld, ohne neuen Historien-Eintrag. MCC geht mit ihrem Tachymeter. */
+  M.openPosWahl = function (ids) {
+    var I = M.idx(), all = [];
+    ids.forEach(function (id) { var i = M.info(id); if (!i) return; (i.members && i.members.length ? i.members : [id]).forEach(function (m) { if (all.indexOf(m) < 0) all.push(m); }); });
+    // MCC beim Tachymeter: über den Tachymeter
+    all = all.map(function (id) { var g = I.ger[id]; return g && g.typ === 'mcc' && I.tsOfMcc[id] ? I.tsOfMcc[id] : id; }).filter(function (id, n, a) { return a.indexOf(id) === n; });
+    var ok = [], skip = [], projs = {};
+    all.forEach(function (id) {
+      var i = M.info(id);
+      if (!i.cur || i.isMag) { skip.push(i.g.name + ' (im Magazin)'); return; }
+      if (!i.proj) { skip.push(i.g.name + ' (kein Projekt)'); return; }
+      ok.push(id); projs[i.proj.id] = 1;
+    });
+    if (!ok.length) { M.toast('Die Offertposition gilt für Geräte im Feld mit Projekt. Zuerst mit «Projekt ändern» ins Projekt setzen.', 'err'); return; }
+    var pk = Object.keys(projs);
+    if (pk.length > 1) { M.toast('Die Geräte stehen in ' + pk.length + ' verschiedenen Projekten. Bitte nur Geräte eines Projekts wählen.', 'err'); return; }
+    ok.sort(function (a, b) { return String(I.ger[a].name).localeCompare(String(I.ger[b].name), 'de', { numeric: true }); });
+    var pj = I.proj[pk[0]], cur = ok.map(function (id) { return M.info(id).cur; });
+    var same = cur.every(function (e) { return (e.positionId || '') === (cur[0].positionId || '') && (e.einheit || '') === (cur[0].einheit || ''); });
+    M.ctx = { kind: 'poswahl', ids: ok, n: ok.length, gid: ok[0] };
+    var names = ok.map(function (id) { var g = I.ger[id]; return g.name + (g.typ === 'tachymeter' && g.mccId && I.ger[g.mccId] ? ' + ' + I.ger[g.mccId].name : ''); });
+    var b = '<p>' + (ok.length === 1 ? '' : ok.length + ' Geräte: ') + '<b>' + esc(names.join(', ')) + '</b> · ' + esc(M.projName(pj)) + '</p>' +
+      (skip.length ? '<p class="small muted">Nicht dabei: ' + esc(skip.join(', ')) + '.</p>' : '') +
+      (!same ? '<p class="small muted">Zurzeit verschieden: ' + esc(cur.map(function (e) { var P = e.positionId && I.pos[e.positionId]; return P ? (P.nr || P.text) : 'ohne'; }).filter(function (x, n, a) { return a.indexOf(x) === n; }).join(', ')) + '</p>' : '') +
+      '<input type="hidden" id="ow-proj" value="' + esc(pj.id) + '">' +
+      '<div id="ow-posbox" class="posbox">' + M.posBoxHtml('ow', pj.id, same ? { positionId: cur[0].positionId, einheit: cur[0].einheit } : {}, ok.length) + '</div>' +
+      '<p class="form-err" id="ow-err" role="alert"></p>' +
+      '<p class="muted small">Gilt ab Beginn des laufenden Einsatzes – es entsteht kein neuer Eintrag in der Historie. Die MCC geht mit ihrem Tachymeter. «– keine Offertposition –» entfernt die Zuordnung.</p>';
+    M.modal({ title: 'Offertposition wählen', form: 'poswahl', body: b, foot: foot('Speichern') });
+    M.posSync('ow');
+  };
+  M.submitPosWahl = function () {
+    var c = M.ctx, t = { projektId: val('ow-proj') };
+    if (val('ow-pos') === M.NEU_PROJ) { $('ow-err').textContent = 'Die neue Offertposition zuerst anlegen (oder abbrechen).'; return; }
+    readPos('ow', t);
+    var P = t.positionId ? M.idx().pos[t.positionId] : null;
+    M.setPosition(c.ids, P ? P.id : null, P && P.art === 'set' ? t.einheit : null).then(function () {
+      M.closeModal(); M.state.invSel = {}; M.refreshUI();
+      M.toast((P ? 'Offertposition ' + (P.nr || P.text) : 'Offertposition entfernt') + ' · ' + c.ids.length + (c.ids.length === 1 ? ' Gerät' : ' Geräte'));
+    });
+  };
+
   /* ================================================== POSITION ÄNDERN (mehrere) */
   M.openBulkPos = function (ids) {
     var ok = [], skip = [];
@@ -1500,6 +1543,7 @@
     else if (f === 'place') M.submitPlace();
     else if (f === 'bulkpos') M.submitBulkPos();
     else if (f === 'auftrag') M.submitAuftrag();
+    else if (f === 'poswahl') M.submitPosWahl();
     else if (f === 'position') M.submitPosition();
     else if (f === 'laufzeit') M.submitLaufzeit();
     else if (f === 'reserve') M.submitReserve();

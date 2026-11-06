@@ -213,6 +213,20 @@
 
   /* ================================================== GERÄTE-DETAIL */
   function attr(k, v, cls) { return '<div class="at"><span>' + esc(k) + '</span><span class="' + (cls || '') + '">' + v + '</span></div>'; }
+  /* Offertposition eines Geräts im Feld, direkt wählbar (ersetzt das Teilprojekt). Finanzbereich: für «User» ausgeblendet. */
+  M.posAttr = function (i) {
+    var pr = M.posRate(i.cur), edit = M.can('edit') && i.proj && !i.mccTs;
+    var v = pr ? esc(M.posLabel(pr.P)) + (pr.u && pr.u.devs.length > 1 ? '<br><span class="muted small">' + esc(M.unitLabel(pr.P, pr.u)) + '</span>' : '')
+      : '<span class="muted">' + (i.proj ? 'keine' : 'kein Projekt') + '</span>';
+    if (i.mccTs) v += ' <span class="muted small">(mit Tachymeter ' + esc(i.mccTs.name) + ')</span>';
+    if (edit) v += ' <button type="button" class="link-btn small" data-act="pos-wahl" data-id="' + i.g.id + '">' + (pr ? 'ändern' : 'wählen') + '</button>';
+    return '<div class="at fin"><span>Offertposition</span><span>' + v + '</span></div>';
+  };
+  /* kurze Marke der Offertposition für Listen (statt Teilprojekt) */
+  M.posTag = function (e) {
+    var P = e && e.ort === 'feld' && e.positionId && M.idx().pos[e.positionId];
+    return P ? '<br><span class="au-tag fin" title="' + esc(M.posLabel(P)) + '">' + esc(P.nr ? 'Pos. ' + P.nr : P.text.slice(0, 24)) + '</span>' : '';
+  };
 
   /* Kopf und Aktionen eines Geräts (Kartenpanel und Gerätefenster) */
   M.detailHead = function (gid, big) {
@@ -359,9 +373,7 @@
     if (i.res) h += attr('Reserviert für', esc(M.projName(i.res.proj)) + (i.res.ab ? ' · Montage ab ' + M.fmtDate(i.res.ab) : '') + (i.res.bemerkung ? '<br><span class="muted small">' + esc(i.res.bemerkung) + '</span>' : '') +
       ' <button type="button" class="link-btn" data-act="reserve" data-id="' + gid + '">ändern</button>');
     if (i.cur && !i.isMag) {
-      var pr0 = M.posRate(i.cur);
-      if (pr0) h += attr('Offertposition', esc(M.posLabel(pr0.P)) + (pr0.u && pr0.u.devs.length > 1 ? '<br><span class="muted small">' + esc(M.unitLabel(pr0.P, pr0.u)) + '</span>' : ''));
-      h += attr('Teilprojekt', M.auftragOf(i.cur) ? '<span class="mono">' + esc(M.auftragOf(i.cur)) + '</span>' : '<span class="muted">–</span>');
+      h += M.posAttr(i);
       h += attr('Laufzeit', M.planInfo(i.cur) ? '<span class="' + (M.planInfo(i.cur).ueber ? 'warn-t' : '') + '">' + esc(M.planText(i.cur)) + '</span> <button type="button" class="link-btn small" data-act="laufzeit" data-id="' + i.g.id + '">ändern</button>' : '<span class="muted">nicht geplant</span> <button type="button" class="link-btn small" data-act="laufzeit" data-id="' + i.g.id + '">planen</button>');
     }
     h += attr('Seit', i.cur ? M.fmtDate(i.cur.von) + (i.cur.gesetztVon ? ' · ' + esc(i.cur.gesetztVon) : '') : '–');
@@ -437,7 +449,7 @@
         '<button type="button" class="btn sm inv" data-act="bulk-move">Projekt ändern …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-pos">Position ändern …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-ms">Zu Messstelle zusammenfassen …</button>' +
-        '<button type="button" class="btn sm inv" data-act="bulk-auftrag">Teilprojekt setzen …</button>' +
+        '<button type="button" class="btn sm inv fin" data-act="bulk-poswahl">Offertposition wählen …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-plan">Laufzeit planen …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-mag">Ins Magazin …</button>' +
         '<button type="button" class="btn sm inv" data-act="bulk-res">Reservieren …</button>' +
@@ -472,7 +484,7 @@
         '<td class="c-name' + (child ? ' ms-indent' : '') + '"><button type="button" class="link-btn strong" data-act="open" data-id="' + g.id + '">' + esc(g.name) + '</button></td>' +
         '<td class="c-kat">' + esc(i.kat ? i.kat.name : M.typLabel[g.typ]) + '</td>' +
         '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.mccTs ? 'bei ' + i.mccTs.name : i.ortText) + '</td>' +
-        '<td class="c-proj' + (child || i.proj || i.res || (i.cur && M.auftragOf(i.cur)) ? '' : ' m-empty') + '">' + (i.proj ? esc(M.projName(i.proj)) : i.res ? '<span class="res-t">res. ' + esc(M.projName(i.res.proj)) + '</span>' : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
+        '<td class="c-proj' + (child || i.proj || i.res ? '' : ' m-empty') + '">' + (i.proj ? esc(M.projName(i.proj)) : i.res ? '<span class="res-t">res. ' + esc(M.projName(i.res.proj)) + '</span>' : '<span class="muted">–</span>') + M.posTag(i.cur) + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(g.hersteller || '') + '</td><td class="mono m-hide">' + esc(g.seriennummer || '') + '</td>' +
         '<td class="mono m-hide">' + M.fmtDate(g.kaufdatum) + '</td>' +
         '<td class="r mono m-hide fin">' + M.chf(g.wert) + '</td>' +
@@ -503,7 +515,7 @@
           return weg.length ? '<br><span class="small ' + (res ? 'res-t' : 'muted') + '">' + (res ? res + ' reserviert im Magazin' : '') + (weg.length > res ? (res ? ' · ' : '') + (weg.length - res) + ' an eigenem Standort' : '') + '</span>' : '';
         })() + '</td>' +
         '<td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.ortText) + '</td>' +
-        '<td class="c-proj">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
+        '<td class="c-proj">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + M.posTag(i.cur) + M.planTag(i.cur) + '</td>' +
         '<td class="m-hide">' + esc(her.length === 1 ? her[0] : her.length ? 'gemischt' : '') + '</td><td class="muted m-hide">' + mem.length + ' Stk.</td>' +
         '<td class="mono m-hide">' + (kd.length === 1 ? M.fmtDate(kd[0]) : kd.length ? M.fmtDate(kd[0]) + ' –<br>' + M.fmtDate(kd[kd.length - 1]) : '–') + '</td>' +
         '<td class="r mono m-hide fin">' + M.chf(w) + '</td><td class="r mono calc c-rest fin" data-l="Restwert">' + M.chf(r) + '</td>' +
@@ -535,7 +547,7 @@
       var pct = w ? Math.min(100, Math.round(w.pct * 100)) : 0;
       h += '<tr><td class="c-sym">' + M.symbol(t.id, 26) + '</td><td class="c-name"><button type="button" class="link-btn strong" data-act="open" data-id="' + t.id + '">' + esc(t.name) + '</button></td>' +
         '<td class="c-kat">' + esc(t.gtyp || '') + '</td><td class="mono c-sn">' + esc(t.seriennummer || '') + '</td><td class="c-ort' + (i.ortFehlt ? ' warn-t' : '') + '">' + esc(i.ortText) + '</td>' +
-        '<td class="c-proj' + (i.proj ? '' : ' m-empty') + '">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + (i.cur && M.auftragOf(i.cur) ? '<br><span class="au-tag">' + esc(M.auftragOf(i.cur)) + '</span>' : '') + M.planTag(i.cur) + '</td>' +
+        '<td class="c-proj' + (i.proj ? '' : ' m-empty') + '">' + (i.proj ? esc(M.projName(i.proj)) : '<span class="muted">–</span>') + M.posTag(i.cur) + M.planTag(i.cur) + '</td>' +
         '<td class="c-mcc" data-l="MCC"><label class="sr" for="mcc-' + t.id + '">MCC für ' + esc(t.name) + '</label><select id="mcc-' + t.id + '" class="sel-sm" data-change="mcc" data-id="' + t.id + '">' + mopts + '</select></td>' +
         '<td class="mono m-hide">' + (w ? M.fmtDate(w.letzte) : '–') + '</td>' +
         '<td class="c-w" data-l="Seit Wartung">' + (w ? '<div class="mini-bar' + (w.faellig ? ' due' : '') + '"><span style="width:' + pct + '%"></span></div><span class="mono small">' + w.tage + ' / ' + w.limit + ' T' + (i.isMag ? ' ‖' : '') + '</span>' : '–') + '</td>' +
@@ -1015,9 +1027,7 @@
     if (i.res) h += attr('Reserviert für', esc(M.projName(i.res.proj)) + (i.res.ab ? ' · Montage ab ' + M.fmtDate(i.res.ab) : '') + (i.res.bemerkung ? '<br><span class="muted small">' + esc(i.res.bemerkung) + '</span>' : '') +
       ' <button type="button" class="link-btn" data-act="reserve" data-id="' + gid + '">ändern</button>');
     if (i.cur && !i.isMag) {
-      var pr0 = M.posRate(i.cur);
-      if (pr0) h += attr('Offertposition', esc(M.posLabel(pr0.P)) + (pr0.u && pr0.u.devs.length > 1 ? '<br><span class="muted small">' + esc(M.unitLabel(pr0.P, pr0.u)) + '</span>' : ''));
-      h += attr('Teilprojekt', M.auftragOf(i.cur) ? '<span class="mono">' + esc(M.auftragOf(i.cur)) + '</span>' : '<span class="muted">–</span>');
+      h += M.posAttr(i);
       h += attr('Laufzeit', M.planInfo(i.cur) ? '<span class="' + (M.planInfo(i.cur).ueber ? 'warn-t' : '') + '">' + esc(M.planText(i.cur)) + '</span> <button type="button" class="link-btn small" data-act="laufzeit" data-id="' + i.g.id + '">ändern</button>' : '<span class="muted">nicht geplant</span> <button type="button" class="link-btn small" data-act="laufzeit" data-id="' + i.g.id + '">planen</button>');
     }
     h += attr('Seit', i.cur ? M.fmtDate(i.cur.von) : '–');
