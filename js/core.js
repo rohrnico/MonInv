@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.7.14';
+  M.VERSION = '0.7.15';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -514,16 +514,73 @@
     }
     var arr = M.state.data[col];
     var i = arr.findIndex(function (r) { return r.id === rec.id; });
+    M.logChange(col, i >= 0 ? arr[i] : null, rec);
     if (i >= 0) arr[i] = rec; else arr.push(rec);
     M.bump();
     return M.store.save(col, rec).catch(M.failed);
   };
   M.del = function (col, id) {
     if (!M.can('edit')) { console.info('MonInv: nur lesen, nicht gelöscht', col, id); return Promise.resolve(); }
+    M.logChange(col, M.state.data[col].find(function (r) { return r.id === id; }) || null, null);
     M.state.data[col] = M.state.data[col].filter(function (r) { return r.id !== id; });
     M.bump();
     return M.store.remove(col, id).catch(M.failed);
   };
+  /* ---------- Änderungsprotokoll: wer hat wann was geändert. Ein Eintrag pro gespeichertem Datensatz,
+     mit den geänderten Feldern (alt → neu). Geschrieben wird gesammelt im Hintergrund. */
+  var LOG_SKIP = { id: 1, amortGebucht: 1 };
+  function logVal(v) {
+    if (v === undefined || v === null || v === '') return null;
+    if (typeof v === 'object') { var j = JSON.stringify(v); return j.length > 160 ? j.slice(0, 157) + '…' : j; }
+    return v;
+  }
+  M.logDiff = function (alt, neu) {
+    var d = [], keys = {};
+    Object.keys(alt || {}).concat(Object.keys(neu || {})).forEach(function (k) { if (!LOG_SKIP[k]) keys[k] = 1; });
+    var posA = alt && M.has(alt.lat) ? [alt.lat, alt.lng] : null, posN = neu && M.has(neu.lat) ? [neu.lat, neu.lng] : null;
+    if (!posA !== !posN || (posA && M.dist(posA, posN) >= 0.5)) d.push(['pos', posA, posN]);
+    Object.keys(keys).forEach(function (k) {
+      if (k === 'lat' || k === 'lng') return;
+      var a = logVal(alt && alt[k]), b = logVal(neu && neu[k]);
+      if (k === 'punkte') { a = alt && alt.punkte ? alt.punkte.length + ' Punkte' : null; b = neu && neu.punkte ? neu.punkte.length + ' Punkte' : null; if (JSON.stringify(alt && alt.punkte) !== JSON.stringify(neu && neu.punkte) && a === b) b = b + ' (neu gezeichnet)'; }
+      if (JSON.stringify(a) !== JSON.stringify(b)) d.push([k, a, b]);
+    });
+    return d;
+  };
+  M.logQueue = [];
+  M.logChange = function (col, alt, neu) {
+    if (!M.store || !M.store.logAdd) return;
+    var rec = neu || alt; if (!rec) return;
+    var d = M.logDiff(alt, neu);
+    if (alt && neu && !d.length) return;
+    // automatisch ergänzter Ortsname (aus der Position) ist keine Änderung durch jemanden
+    if (alt && neu && d.length === 1 && d[0][0] === 'ortName' && !d[0][1]) return;
+    var I = M.idx(), gid = col === 'geraete' ? rec.id : rec.geraetId || null, g = gid ? I.ger[gid] : null;
+    var name = col === 'geraete' || col === 'einsaetze' || col === 'wartungen' ? (g ? g.name : rec.name || '') :
+      col === 'positionen' ? 'Pos. ' + (rec.nr || '?') + ' ' + (rec.text || '') : col === 'einstellungen' ? 'Einstellungen' : (rec.name || rec.text || rec.titel || '');
+    var info = col === 'einsaetze' ? (rec.ort === 'magazin' ? (I.proj[rec.magazinId] ? I.proj[rec.magazinId].name : 'Magazin') : (I.proj[rec.projektId] ? M.projName(I.proj[rec.projektId]) : 'Feld')) + ' ab ' + M.fmtDate(rec.von) : '';
+    M.logQueue.push({ id: M.uid('log'), t: new Date().toISOString(), wer: M.userEmail() || M.userKuerzel() || 'lokal', col: col, rid: rec.id, ger: gid, info: info,
+      proj: col === 'projekte' ? rec.id : rec.projektId || null, a: !alt ? 'neu' : !neu ? 'gelöscht' : 'geändert', name: name, d: !alt || !neu ? d.filter(function (x) { return x[0] !== 'pos' || !neu; }).slice(0, 30) : d });
+    clearTimeout(M._logT);
+    M._logT = setTimeout(M.logFlush, 1500);
+  };
+  M.logFlush = function () {
+    var q = M.logQueue; if (!q.length || !M.store || !M.store.logAdd) return Promise.resolve();
+    M.logQueue = [];
+    M.logCache = null;
+    return M.store.logAdd(q).catch(function (e) { console.warn('MonInv: Protokoll nicht gespeichert', e); });
+  };
+  /* Protokoll laden (neueste zuerst); kurz zwischengespeichert */
+  M.logLoad = function (force) {
+    if (!M.store || !M.store.logLoad) return Promise.resolve([]);
+    if (M.logCache && !force && Date.now() - M.logCache.t < 30000) return Promise.resolve(M.logCache.list);
+    return M.logFlush().then(function () { return M.store.logLoad(); }).then(function (list) {
+      list.sort(function (a, b) { return a.t < b.t ? 1 : -1; });
+      M.logCache = { t: Date.now(), list: list };
+      return list;
+    });
+  };
+
   M.failed = function (e) {
     console.error(e);
     M.toast('Nicht gespeichert: ' + (e && e.message ? e.message : 'unbekannter Fehler'), 'err');

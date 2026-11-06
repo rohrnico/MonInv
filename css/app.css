@@ -1237,3 +1237,19 @@ form .posbox:not(:empty) { margin-top: 14px; }
   .au-n { grid-area: n; } .au-b { grid-area: b; } .au-hm { grid-area: hm; flex-wrap: wrap; } .au-st { grid-area: st; justify-self: end; }
   .au-hm i { width: 12px; height: 14px; }
 }
+
+/* Änderungsprotokoll */
+.log-h { margin-top: 22px; }
+.log-bar { display: flex; gap: 8px; margin: 8px 0 12px; }
+.log-bar input { flex: 1; min-width: 0; }
+.log { list-style: none; margin: 0; padding: 0; }
+.lg-i { padding: 8px 0; border-bottom: 1px solid var(--linie); font-size: 13px; }
+.lg-i:last-child { border-bottom: 0; }
+.lg-r { display: flex; gap: 10px; align-items: baseline; color: #5A6B80; font-size: 12px; }
+.lg-t { font-size: 11.5px; }
+.lg-w { font-weight: 700; color: var(--blau); }
+.lg-h { margin-top: 2px; }
+.lg-d { list-style: none; margin: 4px 0 0; padding: 0 0 0 10px; border-left: 2px solid var(--himmel); }
+.lg-d li { padding: 1px 0; overflow-wrap: anywhere; }
+.lg-d s { color: #8A929C; }
+.lg-f { color: #5A6B80; }

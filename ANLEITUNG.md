@@ -117,6 +117,26 @@ Der lokale Testmodus hat keine Anmeldung; die Daten liegen dort nur im eigenen B
 - **Schutz:** Die App blendet die Finanzbereiche für User aus und sperrt fürs Sekretariat jedes Ändern. Wer die SharePoint-Listen direkt öffnet, sieht aber, was SharePoint erlaubt. Darum dem Sekretariat in der Website «Monitoring» nur **Lesen** geben (Gruppe «Besucher») – dann sperrt auch SharePoint jedes Ändern. Für einen echten Schutz der Finanzzahlen vor Usern müssten sie in eine eigene Liste mit eigenen Berechtigungen (möglicher Ausbau).
 - Im lokalen Testbetrieb ist man immer Admin.
 
+### Änderungsprotokoll
+
+Jede Änderung an Geräten, Einsätzen, Wartungen, Kabeln, Projekten, Offertpositionen und Einstellungen wird protokolliert: **wann, wer** (Microsoft-Konto) und **was** – bei Änderungen jedes Feld mit altem und neuem Wert (z.B. «Von 02.03.2026 → 02.02.2026»).
+- **Pro Gerät:** Gerätefenster › **Historie** › ganz unten «Wer hat wann was geändert? Anzeigen». Beim Tachymeter erscheinen auch die Änderungen seiner MCC.
+- **Alles:** **Einstellungen › Änderungsprotokoll** › «Anzeigen», mit Filter nach Gerät, Person oder Art; die neuesten 100, «Weitere anzeigen».
+- Finanzangaben (Werte, Amortisation, Offertpositionen, Kosten) sieht die Rolle User auch im Protokoll nicht.
+- Nicht protokolliert: der automatisch ergänzte Ortsname und Speichern ohne Änderung.
+- Gespeichert in der SharePoint-Liste **MonInv_protokoll** (wird beim ersten Eintrag automatisch angelegt, nicht mit den übrigen Daten geladen). Läuft ab Version 0.7.15; frühere Änderungen sind nicht enthalten.
+
+### Automatische Sicherung
+
+Einmal pro Tag sichert MonInv alle Daten als JSON-Datei in die SharePoint-Bibliothek, Ordner **MonInv-Dateien/Sicherungen** (Name `MonInv-Sicherung-JJJJ-MM-TT.json`). Ausgelöst wird sie beim ersten Öffnen des Tages durch jemanden, der ändern darf (Admin oder User) – ein Server ist dafür nicht nötig. Behalten werden die **letzten 30 Sicherungen** und von älteren die **erste jedes Monats**; der Rest wird gelöscht.
+- **Einstellungen › Automatische Sicherung** zeigt die letzte Sicherung, öffnet den Ordner; ein Admin kann «Jetzt sichern».
+- **Wiederherstellen:** Datei im Ordner herunterladen › **Einstellungen › Daten › Sicherung importieren** (Admin).
+- Die Sicherung enthält wie die Listen auch die WLAN-Passwörter der MCC.
+
+### Automatische Tests
+
+Im Ordner `tests/` prüfen 25 Tests die Rechenregeln (10-Tage-Regel, Stück- und Set-Preise, Tachymeter + MCC, Amortisation, Startwert), das Korrigieren der Historie, die Warnungen, das Speichern nach SharePoint (keine doppelten Zeilen), das Änderungsprotokoll und die Aufbewahrung der Sicherungen. GitHub führt sie bei jeder neuen Version automatisch aus (Reiter «Actions» im Repository; rot = etwas stimmt nicht). Lokal: `npm test` (Node 18 oder neuer).
+
 ### Datenprüfung
 
 **Einstellungen › Datenprüfung** (nur Admin) findet Geräte, deren Einsätze sich zeitlich überschneiden – z.B. zweimal «laufend» nach einem doppelten Import oder gleichzeitigem Speichern auf zwei Geräten. Solche Geräte erscheinen im Projekt doppelt und könnten doppelt abgerechnet werden; im Projekt steht dann ein Hinweis. **Bereinigen** führt exakte Doppel (gleicher Beginn, gleicher Ort) zusammen und beendet sonst den früheren Einsatz am Beginn des nächsten. Zusätzlich listet die Prüfung Geräte mit gleichem Namen (getrennte Datensätze) zum Kontrollieren.
@@ -188,7 +208,7 @@ In der Zeitachse eines Projekts hat jedes Gerät eine Zeile; mehrere Einsätze i
 
 **App-Symbol:** Das weisse R aus dem RISTAG-Logo auf RISTAG-Blau (`assets/apple-touch-icon.png`, `assets/icon-192.png`, `assets/icon-512.png`, Browser-Tab: `assets/favicon.svg`; Angaben für den Startbildschirm in `manifest.webmanifest`). Auf dem iPhone: Safari › Teilen › **Zum Home-Bildschirm** – ein schon abgelegtes Symbol einmal entfernen und neu hinzufügen, damit das neue erscheint.
 
-**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.7.14**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.7.14`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
+**Versionsnummer:** steht oben rechts und unter Einstellungen (aktuell **0.7.15**). Bei einer neuen Version die Nummer in `js/core.js` (`M.VERSION`) und in `index.html` (alle `?v=0.7.15`) ersetzen – das zweite sorgt dafür, dass Browser und Handys sofort die neuen Dateien laden statt alte aus dem Zwischenspeicher. Zusätzlich die Nummer in `version.txt` eintragen: Offene Apps merken dann innerhalb von 10 Minuten, dass eine neue Version aufgeschaltet ist, und zeigen «Jetzt neu laden». `config.js` lädt die App bei jedem Start frisch – eine geänderte Datenquelle gilt also sofort nach dem Neuladen, ohne neue Versionsnummer.
 
 
 **Neue Attribute ohne Programmieren:** Einstellungen › Kategorien › Kategorie öffnen › **Zusatzfelder** (Text, Zahl, Datum). Die Felder erscheinen sofort in der Maske, im Detail und im Excel-Export.

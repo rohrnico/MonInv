@@ -882,7 +882,25 @@
       '<p class="muted small"><b>CSV-Import</b> nimmt dasselbe Format wie der Excel-Export: Export machen, in Excel ergänzen, als CSV speichern und wieder importieren. Abgleich über den Namen; neue Namen werden neu angelegt, leere Zellen ändern nichts. Vor dem Import zeigt eine Vorschau, was passiert.</p>';
     if (st.beispiel && M.can('admin')) h += '<div class="hint">Zurzeit sind <b>Beispieldaten</b> geladen. <button type="button" class="btn sm danger" data-act="clear-sample">Alle Daten löschen und leer starten</button></div>';
     if (store.mode === 'lokal') h += '<p><button type="button" class="link-btn" data-act="reset-sample">Beispieldaten neu laden</button></p>';
-    h += '</section><p class="muted small">MonInv Version ' + M.VERSION + ' · Monitoring-Inventar RISTAG Ingenieure AG · Kartendaten © swisstopo</p></div>';
+    h += '</section>';
+    if (store.mode === 'sharepoint') {
+      var bk = M.state.backup || {};
+      if (!bk.geprueft && bk.status !== 'läuft') setTimeout(M.backupInfo, 0);
+      var bt = function (n) { return n ? M.fmtDate(n.slice(17, 27)) : ''; };
+      h += '<section class="card"><div class="card-h"><h2>Automatische Sicherung</h2></div>' +
+        '<p class="small">Einmal pro Tag sichert MonInv alle Daten als JSON-Datei in SharePoint (<b>' + esc(store.backupFolder()) + '</b>) – beim ersten Öffnen des Tages durch jemanden, der ändern darf. Behalten werden die letzten 30 Sicherungen und von älteren die erste jedes Monats.</p>' +
+        '<p class="small">' + (bk.status === 'läuft' ? 'Sicherung läuft …' : bk.status === 'fehler' ? '<span class="warn-t">Letzte Sicherung fehlgeschlagen: ' + esc(bk.msg || '') + '</span>' :
+          bk.letzte ? 'Letzte Sicherung: <b>' + bt(bk.letzte) + '</b> · ' + bk.n + ' Sicherungen vorhanden' : bk.geprueft ? 'Noch keine Sicherung vorhanden.' : 'Wird geprüft …') + '</p>' +
+        '<div class="btn-row"><button type="button" class="btn ghost sm" data-act="backup-folder">Ordner öffnen</button>' +
+        (M.can('admin') ? '<button type="button" class="btn ghost sm" data-act="backup-now">Jetzt sichern</button>' : '') + '</div>' +
+        '<p class="muted small">Wiederherstellen: Datei im Ordner herunterladen, dann oben unter Daten «Sicherung importieren» (Admin). Die Sicherung enthält auch die WLAN-Passwörter der MCC.</p></section>';
+    }
+    h += '<section class="card"><div class="card-h"><h2>Änderungsprotokoll</h2></div>' +
+      '<p class="muted small">Jede Änderung an Geräten, Einsätzen, Kabeln, Projekten und Positionen: wann, wer, was (alt → neu). Läuft ab Version 0.7.15. Einzelne Geräte: Gerätefenster › Historie.</p>' +
+      '<div class="log-bar"><input id="log-q" type="search" placeholder="Filter: Gerät, Person, Projekt …" data-enter="log-all"><button type="button" class="btn ghost sm" data-act="log-all">Anzeigen</button></div>' +
+      '<div id="log-all"></div>' + '</section>';
+
+    h += '<p class="muted small">MonInv Version ' + M.VERSION + ' · Monitoring-Inventar RISTAG Ingenieure AG · Kartendaten © swisstopo</p></div>';
     keepScroll($('v-einstellungen'), h);
   };
 
@@ -1141,7 +1159,82 @@
       }
     });
     if (!items.length) h += '<li class="hx-empty muted">Noch keine Einträge.</li>';
-    return h + '</ol>';
+    h += '</ol>';
+    h += '<div class="sec-h log-h"><span>Änderungsprotokoll</span></div><div class="log-box" id="log-ger" data-id="' + gid + '">' +
+      (M.state.logGer === gid && M.logCache ? logGerHtml(gid, M.logCache.list) :
+        '<button type="button" class="link-btn" data-act="log-ger" data-id="' + gid + '">Wer hat wann was geändert? Anzeigen</button>') + '</div>';
+    return h;
+  };
+
+  /* ---------- Änderungsprotokoll anzeigen */
+  var LOG_COL = { geraete: 'Gerät', einsaetze: 'Einsatz', wartungen: 'Wartung', kabel: 'Kabel', projekte: 'Projekt', positionen: 'Offertposition', kategorien: 'Kategorie', dateien: 'Datei', einstellungen: 'Einstellungen' };
+  var LOG_F = {
+    pos: 'Position', von: 'Von', bis: 'Bis', ort: 'Ort', projektId: 'Projekt', magazinId: 'Magazin', positionId: 'Offertposition', einheit: 'Set',
+    ortName: 'Ortsbezeichnung', auftrag: 'Teilprojekt', gesetztVon: 'Gesetzt von', geholtVon: 'Geholt von', bemerkung: 'Bemerkung', planBis: 'Geplant bis', planMonate: 'Geplante Monate',
+    name: 'Name', typ: 'Typ', gtyp: 'Gerätetyp', kategorieId: 'Kategorie', seriennummer: 'Seriennummer', hersteller: 'Hersteller', kaufdatum: 'Kaufdatum', wert: 'Anschaffungswert',
+    zustand: 'Zustand', sim: 'SIM-Karte', mccId: 'MCC', wlanPasswort: 'WLAN-Passwort', wartungIntervall: 'Wartungsintervall (Mt.)', letzteWartung: 'Letzte Wartung',
+    amortVor: 'Startwert amortisiert', amortVorDatum: 'Startwert per', amortModus: 'Amortisation Art', amortBetrag: 'Amortisation Betrag', gruppeId: 'Messstelle', reserviert: 'Reservation',
+    abbauOk: 'Weiterführen bestätigt', datum: 'Datum', art: 'Art', firma: 'Firma', kosten: 'Kosten', nr: 'Pos.', text: 'Bezeichnung', V: 'Vorhalten', B: 'Betrieb', W: 'Wartung',
+    offMonate: 'Offerierte Monate', amortPct: 'Vorhalten in Amortisation (%)', punkte: 'Linie', reserve: 'Reserve', zuId: 'Gerät', vonId: 'Gerät (anderes Ende)', nummer: 'Projektnummer'
+  };
+  var LOG_FIN = { wert: 1, amortVor: 1, amortVorDatum: 1, amortModus: 1, amortBetrag: 1, positionId: 1, einheit: 1, kosten: 1, V: 1, B: 1, W: 1, offMonate: 1, amortPct: 1, abbauOk: 1, reserviert: 0 };
+  var LOG_DATE = { von: 1, bis: 1, planBis: 1, kaufdatum: 1, letzteWartung: 1, amortVorDatum: 1, datum: 1 };
+  function logFmt(k, v) {
+    var I = M.idx();
+    if (v === null || v === undefined) return k === 'bis' ? 'laufend' : '–';
+    if (k === 'pos') return M.fmtLv95(v[0], v[1]);
+    if (LOG_DATE[k]) return M.fmtDate(v);
+    if (k === 'projektId' || k === 'magazinId') return I.proj[v] ? M.projName(I.proj[v]) : 'gelöscht';
+    if (k === 'positionId') return I.pos[v] ? M.posLabel(I.pos[v]) : 'gelöschte Position';
+    if (k === 'mccId' || k === 'zuId' || k === 'vonId' || k === 'gruppeId') return I.ger[v] ? I.ger[v].name : 'gelöschtes Gerät';
+    if (k === 'kategorieId') return I.kat && I.kat[v] ? I.kat[v].name : String(v);
+    if (k === 'ort') return v === 'feld' ? 'Feld' : v === 'magazin' ? 'Magazin' : v;
+    if (k === 'wlanPasswort') return '••••';
+    if (k === 'einheit') return 'Set';
+    if (k === 'wert' || k === 'kosten' || k === 'amortBetrag' || k === 'amortVor' || k === 'V' || k === 'B' || k === 'W') return 'CHF ' + M.chf(v);
+    return String(v);
+  }
+  function logWer(w) { return String(w || '').replace(/@.*$/, ''); }
+  M.logHtml = function (list, opts) {
+    opts = opts || {};
+    var fin = M.can('fin');
+    list = list.filter(function (x) { return fin || x.col !== 'positionen'; });
+    if (!list.length) return '<p class="muted small">' + (opts.leer || 'Noch keine Änderungen protokolliert.') + '</p>';
+    return '<ol class="log">' + list.map(function (x) {
+      var d = (x.d || []).filter(function (f) { return (fin || !LOG_FIN[f[0]]) && (f[0] === 'punkte' || logFmt(f[0], f[1]) !== logFmt(f[0], f[2])); });
+      var t = new Date(x.t), when = M.fmtDate(M.iso(t)) + ' ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
+      var head = (LOG_COL[x.col] || x.col) + (opts.ohneName ? '' : ' <b>' + esc(x.name || '') + '</b>') + (x.info ? ' <span class="muted">(' + esc(x.info) + ')</span>' : '') + ' ' + esc(x.a);
+      var body = x.a === 'geändert' ? d.map(function (f) {
+        return '<li><span class="lg-f">' + esc(LOG_F[f[0]] || f[0]) + '</span> <s>' + esc(logFmt(f[0], f[1])) + '</s> → <span>' + esc(logFmt(f[0], f[2])) + '</span></li>';
+      }).join('') : x.a === 'neu' && x.col === 'einsaetze' ? '<li>' + esc(logFmt('ort', (d.find(function (f) { return f[0] === 'ort'; }) || [])[2])) + ' · ' + esc(logFmt('von', (d.find(function (f) { return f[0] === 'von'; }) || [])[2])) + '</li>' : '';
+      if (x.a === 'geändert' && !d.length) { if (!(x.d || []).some(function (f) { return LOG_FIN[f[0]]; }) || fin) return ''; body = '<li class="muted">nur Finanzangaben</li>'; }
+      return '<li class="lg-i"><div class="lg-r"><span class="mono lg-t">' + when + '</span><span class="lg-w">' + esc(logWer(x.wer)) + '</span></div><div class="lg-h">' + head + '</div>' + (body ? '<ul class="lg-d">' + body + '</ul>' : '') + '</li>';
+    }).join('') + '</ol>';
+  };
+  function logGerHtml(gid, list) {
+    var g = M.idx().ger[gid], also = g && g.typ === 'tachymeter' && g.mccId ? g.mccId : null;
+    var mine = list.filter(function (x) { return x.ger === gid || x.rid === gid || (also && (x.ger === also || x.rid === also)); }).slice(0, 60);
+    return M.logHtml(mine, { leer: 'Noch keine Änderungen protokolliert (das Protokoll läuft ab Version 0.7.15).' });
+  }
+  M.showLogGer = function (gid) {
+    var bx = $('log-ger'); if (!bx) return;
+    bx.innerHTML = '<p class="muted small">Lädt …</p>';
+    M.state.logGer = gid;
+    M.logLoad(true).then(function (list) {
+      if ($('log-ger')) $('log-ger').innerHTML = logGerHtml(gid, list);
+    }).catch(function (e) { if ($('log-ger')) $('log-ger').innerHTML = '<p class="form-err">Protokoll nicht geladen: ' + esc(e.message || e) + '</p>'; });
+  };
+  M.showLogAll = function (more) {
+    var bx = $('log-all'); if (!bx) return;
+    M.state.logN = more ? (M.state.logN || 100) + 100 : 100;
+    if (!more) bx.innerHTML = '<p class="muted small">Lädt …</p>';
+    M.logLoad(!more).then(function (list) {
+      var q = String(($('log-q') || {}).value || '').trim().toLowerCase();
+      var f = q ? list.filter(function (x) { return (x.name + ' ' + x.wer + ' ' + (LOG_COL[x.col] || '')).toLowerCase().indexOf(q) >= 0; }) : list;
+      var n = M.state.logN;
+      bx.innerHTML = '<p class="muted small">' + f.length + ' Einträge' + (q ? ' mit «' + esc(q) + '»' : '') + (f.length > n ? ', die neuesten ' + n + ' angezeigt' : '') + '.</p>' + M.logHtml(f.slice(0, n)) +
+        (f.length > n ? '<button type="button" class="btn ghost sm" data-act="log-more">Weitere anzeigen</button>' : '');
+    }).catch(function (e) { bx.innerHTML = '<p class="form-err">Protokoll nicht geladen: ' + esc(e.message || e) + '</p>'; });
   };
 
   /* ---------- Reiter Amortisation */

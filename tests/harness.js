@@ -22,7 +22,7 @@ function app(opts) {
   opts = opts || {};
   const doc = { getElementById: () => null, createElement: el, createElementNS: el, querySelector: () => null, querySelectorAll: () => [],
     addEventListener() {}, removeEventListener() {}, body: el(), documentElement: el(), hidden: false };
-  const sb = { console, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, Promise, Date, Math, JSON,
+  const sb = { console, Blob, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, Promise, Date, Math, JSON,
     document: doc, localStorage: mem(), sessionStorage: mem(), navigator: { userAgent: 'node' }, location: { href: 'http://test/', search: '', hash: '' },
     matchMedia: () => ({ matches: false, addEventListener() {} }), requestAnimationFrame: f => setTimeout(f, 0), fetch: () => Promise.reject(new Error('offline')),
     MONINV_CONFIG: { modus: 'lokal' } };

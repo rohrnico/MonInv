@@ -1357,13 +1357,16 @@
     var e = M.copy(orig);
     var r = readLoc('el');
     if (r.err) { $('e-err').textContent = r.err; return; }
+    // LV95 wird beim Anzeigen gerundet und beim Speichern zurückgerechnet: weniger als 0.5 m Unterschied = unverändert
+    if (M.has(r.t.lat) && M.has(e.lat) && M.dist([r.t.lat, r.t.lng], [e.lat, e.lng]) < 0.5) { r.t.lat = e.lat; r.t.lng = e.lng; }
     var moved = r.t.lat !== e.lat || r.t.lng !== e.lng;
+    var keepEinheit = r.t.positionId && r.t.positionId === orig.positionId && !$('el-einheit') ? orig.einheit || null : undefined;
     Object.assign(e, { ort: r.t.ort, magazinId: r.t.magazinId || null, projektId: r.t.projektId || null, lat: M.has(r.t.lat) ? r.t.lat : null, lng: M.has(r.t.lng) ? r.t.lng : null, auftrag: r.t.ort === 'feld' ? (r.t.auftrag || '') : '' });
     if (r.t.ort === 'feld') {
       if (r.t.planMonate) { e.planMonate = r.t.planMonate; e.planBis = M.addMonths(val('e-von') || e.von, r.t.planMonate); }
       else if (r.t.planBis !== undefined) { e.planBis = r.t.planBis || null; e.planMonate = null; }
     } else { e.planBis = null; e.planMonate = null; }
-    if (r.t.ort === 'feld' && r.t.positionId) { e.positionId = r.t.positionId; e.einheit = r.t.einheit || null; e.amortModus = 'position'; e.amortBetrag = 0; }
+    if (r.t.ort === 'feld' && r.t.positionId) { e.positionId = r.t.positionId; e.einheit = keepEinheit !== undefined ? keepEinheit : r.t.einheit || null; e.amortModus = 'position'; e.amortBetrag = 0; }
     else if (r.t.ort === 'feld') { e.positionId = null; e.einheit = null; e.amortModus = r.t.amortModus === 'position' ? 'monat' : (r.t.amortModus || 'monat'); e.amortBetrag = M.num(r.t.amortBetrag) || 0; }
     else { e.positionId = null; e.einheit = null; e.amortModus = 'pauschal'; e.amortBetrag = 0; }
     delete e.amortGebucht;

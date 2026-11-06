@@ -59,6 +59,17 @@
     return Promise.resolve();
   };
   LocalStore.prototype.refresh = function () { return Promise.resolve(null); };
+  /* Änderungsprotokoll (lokal: eigener Speicher, die neuesten 3000 Einträge) */
+  LocalStore.prototype.logAdd = function (entries) {
+    var k = this.key + '-protokoll', arr = [];
+    try { arr = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { arr = []; }
+    arr = arr.concat(entries).slice(-3000);
+    try { localStorage.setItem(k, JSON.stringify(arr)); } catch (e) { /* voll: ohne Protokoll weiter */ }
+    return Promise.resolve();
+  };
+  LocalStore.prototype.logLoad = function () {
+    try { return Promise.resolve(JSON.parse(localStorage.getItem(this.key + '-protokoll') || '[]')); } catch (e) { return Promise.resolve([]); }
+  };
 
   /* Dateien (Pläne, Skizzen, Offerten) lokal: IndexedDB, damit auch grosse PDFs Platz haben */
   function idb() {
@@ -202,6 +213,58 @@
       return self._graph('GET', '/drives/' + drive + '/root:/' + encodeURIComponent(folder) + '?$select=webUrl').catch(function () { return self._graph('GET', '/drives/' + drive + '/root?$select=webUrl'); });
     }).then(function (it) { return it.webUrl; });
   };
+  /* ---------- Automatische Sicherung: eine JSON-Datei pro Tag in «MonInv-Dateien/Sicherungen».
+     Behalten werden die letzten 30 Sicherungen und von älteren die erste jedes Monats. */
+  SharePointStore.prototype.backupFolder = function () { return (this.cfg.dateienOrdner || 'MonInv-Dateien') + '/Sicherungen'; };
+  SharePointStore.prototype._putPath = function (path, blob) {
+    var self = this, enc = path.split('/').map(encodeURIComponent).join('/');
+    return this._drive().then(function (drive) {
+      if (blob.size <= 4 * 1024 * 1024) return self._raw('PUT', '/drives/' + drive + '/root:/' + enc + ':/content', blob, { 'Content-Type': 'application/json' }).then(function (r) { return r.json(); });
+      return self._graph('POST', '/drives/' + drive + '/root:/' + enc + ':/createUploadSession', { item: { '@microsoft.graph.conflictBehavior': 'replace' } }).then(function (sess) {
+        var CH = 12 * 327680, size = blob.size;
+        function part(start) {
+          var end = Math.min(size, start + CH);
+          return fetch(sess.uploadUrl, { method: 'PUT', headers: { 'Content-Range': 'bytes ' + start + '-' + (end - 1) + '/' + size }, body: blob.slice(start, end) }).then(function (res) {
+            if (!res.ok) throw new Error('SharePoint-Upload: HTTP ' + res.status);
+            return end < size ? part(end) : res.json();
+          });
+        }
+        return part(0);
+      });
+    });
+  };
+  SharePointStore.prototype.backupList = function () {
+    var self = this, enc = this.backupFolder().split('/').map(encodeURIComponent).join('/');
+    return this._drive().then(function (drive) {
+      return self._graph('GET', '/drives/' + drive + '/root:/' + enc + ':/children?$select=id,name,size,webUrl&$top=999').then(function (r) {
+        return (r.value || []).filter(function (f) { return /^MonInv-Sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(f.name); }).sort(function (a, b) { return a.name < b.name ? 1 : -1; });
+      }, function (e) { if (e.status === 404) return []; throw e; });
+    });
+  };
+  SharePointStore.prototype.backupDaily = function (makeJson, heute, force) {
+    var self = this, name = 'MonInv-Sicherung-' + heute + '.json';
+    return this.backupList().then(function (files) {
+      if (!force && files.some(function (f) { return f.name === name; })) return { name: name, neu: false, files: files };
+      var blob = new Blob([makeJson()], { type: 'application/json' });
+      return self._putPath(self.backupFolder() + '/' + name, blob).then(function () {
+        return self.backupList();
+      }).then(function (list) {
+        // aufräumen: neueste 30 behalten, ältere nur die erste Sicherung jedes Monats
+        var keepMonth = {}, del = [];
+        list.slice(30).slice().reverse().forEach(function (f) {
+          var mon = f.name.slice(17, 24);
+          if (!keepMonth[mon]) keepMonth[mon] = 1; else del.push(f);
+        });
+        return self._drive().then(function (drive) {
+          return Promise.all(del.map(function (f) { return self._raw('DELETE', '/drives/' + drive + '/items/' + f.id).catch(function () {}); }));
+        }).then(function () { return { name: name, neu: true, files: list.filter(function (f) { return del.indexOf(f) < 0; }), geloescht: del.length }; });
+      });
+    });
+  };
+  SharePointStore.prototype.backupUrl = function () {
+    var self = this, enc = this.backupFolder().split('/').map(encodeURIComponent).join('/');
+    return this._drive().then(function (drive) { return self._graph('GET', '/drives/' + drive + '/root:/' + enc + '?$select=webUrl'); }).then(function (it) { return it.webUrl; });
+  };
   SharePointStore.prototype.removeBlob = function (ref) {
     if (!ref || !ref.itemId) return Promise.resolve();
     var self = this;
@@ -317,6 +380,7 @@
     }).then(function (r) {
       var byName = {};
       (r.value || []).forEach(function (l) { byName[l.displayName] = l.id; });
+      self.allLists = byName;
       var missing = [];
       COLLECTIONS.forEach(function (c) {
         var name = self.cfg.listenPrefix + c;
@@ -335,6 +399,46 @@
       columns: [{ name: 'Daten', text: { allowMultipleLines: true, textType: 'plain' } }],
       list: { template: 'genericList' }
     }).then(function (l) { self.lists[col] = l.id; });
+  };
+
+  /* ---------- Änderungsprotokoll: eigene Liste «<Präfix>protokoll», wird beim ersten Eintrag angelegt
+     und nicht mit den übrigen Daten geladen (nur bei Bedarf). Geschrieben wird gebündelt (Graph $batch, je 20). */
+  SharePointStore.prototype._logList = function () {
+    var self = this, name = this.cfg.listenPrefix + 'protokoll';
+    if (this.lists.protokoll) return Promise.resolve(this.lists.protokoll);
+    if (this.allLists && this.allLists[name]) { this.lists.protokoll = this.allLists[name]; return Promise.resolve(this.lists.protokoll); }
+    if (!this._logListP) this._logListP = this._createList('protokoll').then(function () { return self.lists.protokoll; }, function (e) { self._logListP = null; throw e; });
+    return this._logListP;
+  };
+  SharePointStore.prototype.logAdd = function (entries) {
+    var self = this;
+    if (!entries.length) return Promise.resolve();
+    return this._logList().then(function (lid) {
+      var base = '/sites/' + self.siteId + '/lists/' + lid + '/items', jobs = [];
+      for (var i = 0; i < entries.length; i += 20) {
+        jobs.push(self._graph('POST', '/$batch', { requests: entries.slice(i, i + 20).map(function (en, n) {
+          return { id: String(n + 1), method: 'POST', url: base, headers: { 'Content-Type': 'application/json' }, body: { fields: { Title: en.rid || en.id, Daten: JSON.stringify(en) } } };
+        }) }).then(function (r) {
+          var bad = ((r && r.responses) || []).filter(function (x) { return x.status >= 400; });
+          if (bad.length) console.warn('MonInv: ' + bad.length + ' Protokolleinträge nicht gespeichert', bad[0].body);
+        }));
+      }
+      return Promise.all(jobs);
+    });
+  };
+  SharePointStore.prototype.logLoad = function () {
+    var self = this, name = this.cfg.listenPrefix + 'protokoll';
+    if (!this.lists.protokoll && !(this.allLists && this.allLists[name])) return Promise.resolve([]);
+    return this._logList().then(function (lid) {
+      var out = [];
+      function page(u) {
+        return self._graph('GET', u).then(function (r) {
+          (r.value || []).forEach(function (it) { try { out.push(JSON.parse((it.fields || {}).Daten || '{}')); } catch (e) { /* defekt */ } });
+          if (r['@odata.nextLink']) return page(r['@odata.nextLink']);
+        });
+      }
+      return page('/sites/' + self.siteId + '/lists/' + lid + '/items?$expand=fields($select=Daten)&$top=999').then(function () { return out; });
+    });
   };
 
   SharePointStore.prototype._loadList = function (col) {

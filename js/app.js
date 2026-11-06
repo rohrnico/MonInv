@@ -353,11 +353,38 @@
     });
     download('MonInv-Kabel-' + stamp() + '.csv', csv(rows), 'text/csv;charset=utf-8');
   };
-  M.exportJson = function () {
-    if (!M.can('admin')) { M.toast('Die Sicherung erstellt ein Admin.', 'err'); return; }
+  M.backupJson = function () {
     var out = { app: 'MonInv', appVersion: M.VERSION, version: 2, exportiert: new Date().toISOString() };
     window.MonStore.COLLECTIONS.forEach(function (c) { out[c] = M.state.data[c]; });
-    download('MonInv-Sicherung-' + stamp() + '.json', JSON.stringify(out, null, 1), 'application/json');
+    return JSON.stringify(out, null, 1);
+  };
+  M.exportJson = function () {
+    if (!M.can('admin')) { M.toast('Die Sicherung erstellt ein Admin.', 'err'); return; }
+    download('MonInv-Sicherung-' + stamp() + '.json', M.backupJson(), 'application/json');
+  };
+  /* Automatische Sicherung (SharePoint): beim ersten Öffnen des Tages durch jemanden, der ändern darf */
+  M.autoBackup = function (force) {
+    if (!M.store.backupDaily || !M.can('edit') || !M.state.data.geraete.length) return Promise.resolve();
+    var heute = M.today(), key = 'moninv-backup-' + (M.store.cfg && M.store.cfg.site || '');
+    if (!force) { try { if (localStorage.getItem(key) === heute) return Promise.resolve(); } catch (e) { /* ohne Speicher: trotzdem prüfen */ } }
+    M.state.backup = { status: 'läuft' };
+    return M.store.backupDaily(M.backupJson, heute, force).then(function (r) {
+      try { localStorage.setItem(key, heute); } catch (e) { /* egal */ }
+      M.state.backup = { status: 'ok', name: r.name, neu: r.neu, n: r.files.length, letzte: r.files[0] && r.files[0].name };
+      if (force) M.toast('Sicherung ' + r.name + ' gespeichert');
+      if (M.state.view === 'einstellungen') M.renderSettings();
+    }).catch(function (e) {
+      M.state.backup = { status: 'fehler', msg: e.message || String(e) };
+      console.warn('MonInv: automatische Sicherung fehlgeschlagen', e);
+      if (force) M.toast('Sicherung fehlgeschlagen: ' + (e.message || e), 'err');
+    });
+  };
+  M.backupInfo = function () {
+    if (!M.store.backupList) return;
+    M.store.backupList().then(function (files) {
+      M.state.backup = Object.assign({}, M.state.backup || {}, { status: (M.state.backup || {}).status === 'fehler' ? 'fehler' : 'ok', n: files.length, letzte: files[0] && files[0].name, geprueft: true });
+      if (M.state.view === 'einstellungen') M.renderSettings();
+    }).catch(function (e) { M.state.backup = { status: 'fehler', msg: e.message || String(e), geprueft: true }; if (M.state.view === 'einstellungen') M.renderSettings(); });
   };
   M.importJson = function (file) {
     var r = new FileReader();
@@ -477,6 +504,9 @@
     'laufzeit': function (d) { M.openLaufzeit([d.id]); },
     'bulk-auftrag': function () { M.openAuftrag(selectedIds()); },
     'bulk-poswahl': function () { M.openPosWahl(selectedIds()); },
+    'log-ger': function (d) { M.showLogGer(d.id); },
+    'log-all': function () { M.showLogAll(false); },
+    'log-more': function () { M.showLogAll(true); },
     'pos-wahl': function (d) { M.openPosWahl([d.id]); },
     'bulk-ms': function () { M.openMsNew(selectedIds()); },
     'ms-new': function (d) { M.openMsNew(String(d.ids || '').split(',').filter(Boolean)); },
@@ -578,6 +608,12 @@
       M.setRolle(mail, r).then(function () { M.toast(mail + ' ist jetzt ' + M.ROLLEN[r].name); });
     },
     'date-clear': function (d, el) { M.dateClear(el); },
+    'backup-now': function () { M.autoBackup(true); },
+    'backup-folder': function () {
+      if (!M.store.backupUrl) return;
+      var w = window.open('', '_blank');
+      M.store.backupUrl().then(function (u) { if (w) w.location = u; else location.href = u; }).catch(function (e) { if (w) w.close(); M.toast('Ordner nicht gefunden (noch keine Sicherung?): ' + (e.message || e), 'err'); });
+    },
     'sp-folder': function () {
       if (!M.store.folderUrl) return;
       var w = window.open('', '_blank');
@@ -790,13 +826,13 @@
   var RO_ACT = set('go sel open desel inv-open reload-app file-open dw-files viewer-close viewer-tab open-any abr-q abr-export abr-view abr-pdf ' +
     'show-map map-goto toggle-grp toggle-kabel layer fit side-open side-close logout drawer-close details dw-tab modal-close modal-bg search-pick ' +
     'export-csv export-hist export-kabel refresh proj-sel proj-back inv-filt projf proj-map pw-show pw-copy kabel-sel kabel-focus ' +
-    'scan scan-multi scan-mode scan-manual scan-rm sa-show bulk-clear role-test ausl ausl-back ausl-range ausl-tog sp-folder');
+    'scan scan-multi scan-mode scan-manual scan-rm sa-show bulk-clear role-test ausl ausl-back ausl-range ausl-tog sp-folder log-ger log-all log-more backup-folder');
   var RO_CHANGE = set('mapf invf inv-sel inv-all abr projf msa-q');
   var RO_FORM = set('scan ortsuche');
   var FIN_ACT = set('abr-q abr-export abr-view abr-pdf pos-new pos-edit pos-del po-grp po-art amort-scope amort-mode');
   function allowed(an, d) {
     if (an === 'role-test') return M.realRole() === 'admin';
-    if (an === 'user-add' || an === 'user-del' || an === 'check-fix' || an === 'check-open') return M.can('admin');
+    if (an === 'user-add' || an === 'user-del' || an === 'check-fix' || an === 'check-open' || an === 'backup-now') return M.can('admin');
     if (!M.can('fin') && (FIN_ACT[an] || (an === 'dw-tab' && d.k === 'amort'))) return false;
     if (!M.can('edit')) return !!RO_ACT[an] || (an === 'scan-go' && d.k === 'inv');
     return true;
@@ -932,6 +968,7 @@
       if (M.pendingOpen) setTimeout(M.pendingOpen, 80);   // Link aus einem QR-Etikett
       setTimeout(M.fillMissingOrt, 1500);
       setTimeout(M.cleanupDups, 2500);
+      setTimeout(function () { M.autoBackup(false); }, 8000);
       // Neue Version aufgeschaltet? (version.txt liegt neben index.html)
       var checkVer = function () {
         if (location.protocol === 'file:') return;
@@ -959,7 +996,8 @@
           }).catch(function (e) { console.warn(e); });
         };
         setInterval(poll, sec * 1000);
-        document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); else M.logFlush(); });
+        window.addEventListener('pagehide', function () { M.logFlush(); });
       }
     }).catch(function (e) {
       console.error(e);
