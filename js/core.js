@@ -8,7 +8,7 @@
   M.esc = S.esc;
 
   /* Versionsnummer der App. Bei jeder neuen Version hier UND in index.html (?v=…) ersetzen. */
-  M.VERSION = '0.7.13';
+  M.VERSION = '0.7.14';
   /* Handy-Darstellung (gleiche Grenze wie in css/mobile.css) */
   M.isMobile = function () { return !!(window.matchMedia && window.matchMedia('(max-width: 760px)').matches); };
 
@@ -403,25 +403,35 @@
     var s = i.g.zustand === 'ausgemustert' ? ['Ausgemustert', 'chip-off'] : i.state === 'ok' && i.lz && i.lz.warn ? ['Abbau fällig', 'chip-warn'] : M.stateLabel[i.state];
     return '<span class="chip ' + s[1] + '">' + s[0] + '</span>';
   };
-  /* Warnungen eines Geräts auf der Karte (Handlungsbedarf), inkl. der MCC beim Tachymeter und der Geräte
-     einer Messstelle, die bei ihr stehen – diese erscheinen nicht einzeln auf der Karte. */
-  M.warnings = function (i, nested) {
-    var out = [], g = i.g;
-    if (i.state !== 'defekt') {
-      if (i.wart && i.wart.faellig) out.push('Wartung fällig');
-      if (i.ortFehlt) out.push('Position fehlt');
-      if (i.mccFehlt) out.push('MCC fehlt');
-      if (i.lz && i.lz.warn) out.push('Abbau fällig (Laufzeit laut Offerte)');
+  /* Warnungen eines Kartensymbols (Handlungsbedarf). Tachymeter und MCC zählen als ein Objekt: jede Art Warnung
+     nur einmal. «Abbau fällig» gilt fürs ganze Set bzw. die Einheit und zählt ebenfalls nur einmal. Bei einer
+     Messstelle zählen die Geräte, die bei ihr stehen, je einzeln mit (sie erscheinen nicht einzeln auf der Karte). */
+  function warnRaw(i) {
+    var out = [];
+    if (i.state === 'defekt') return out;
+    if (i.wart && i.wart.faellig) out.push({ k: 'wartung', t: 'Wartung fällig' });
+    if (i.ortFehlt) out.push({ k: 'ort', t: 'Position fehlt' });
+    if (i.mccFehlt) out.push({ k: 'mcc', t: 'MCC fehlt' });
+    if (i.lz && i.lz.warn) out.push({ k: 'abbau', t: 'Abbau fällig (Offertdauer erreicht)', u: i.lz.P.id + '|' + (i.lz.u.key || '') });
+    return out;
+  }
+  M.warnings = function (i) {
+    var out = [], seen = {}, g = i.g, I = M.idx();
+    function add(list, obj, name) {
+      list.forEach(function (w) {
+        var key = w.k === 'abbau' ? 'abbau|' + w.u : w.k + '|' + obj;
+        if (seen[key]) return; seen[key] = 1;
+        out.push(name ? name + ': ' + w.t : w.t);
+      });
     }
-    if (nested) return out;
-    var pre = function (name, arr) { return arr.map(function (w) { return name + ': ' + w; }); };
-    if (g.typ === 'tachymeter' && g.mccId && M.idx().ger[g.mccId]) {
+    add(warnRaw(i), g.id, '');
+    if (g.typ === 'tachymeter' && g.mccId && I.ger[g.mccId]) {
       var mi = M.info(g.mccId);
-      if (mi && !mi.isMag) out = out.concat(pre(mi.g.name, M.warnings(mi, true)));
+      if (mi && !mi.isMag) add(warnRaw(mi), g.id, mi.g.name);   // gleiches Objekt wie der Tachymeter
     }
     if (i.members) i.members.forEach(function (m) {
       var mi = M.info(m);
-      if (mi && mi.msBei) out = out.concat(pre(mi.g.name, M.warnings(mi, true)));
+      if (mi && mi.msBei) add(warnRaw(mi), m, mi.g.name);
     });
     return out;
   };
